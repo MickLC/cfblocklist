@@ -15,7 +15,7 @@
                 </tr> 
             </table>
         </form>
-        <cfif isDefined(testresult)>
+        <cfif isDefined($testresult)>
             <cfoutput>$testresult</cfoutput>
         </cfif>
     </body>
