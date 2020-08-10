@@ -15,5 +15,8 @@
                 </tr> 
             </table>
         </form>
+        <cfif isDefined("testresult")>
+            <cfoutput>$testresult</cfoutput>
+        </cfif>
     </body>
 </html>
