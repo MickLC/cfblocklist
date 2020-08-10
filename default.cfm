@@ -1,5 +1,5 @@
 <cfif isDefined("form.submit")>
-    <cfset testresult = "We would check " & $form.ip_addr & " here."
+    <cfset testresult = "We would check " & $form.ip_addr & " here." />
 </cfif>
 <html>
     <body>
