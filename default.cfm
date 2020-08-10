@@ -1,5 +1,5 @@
 <cfif isDefined("form.submit")>
-    <cfset testresult = "We would check " & form.ip_addr & " here." />
+    <cfset testresult = "<br />We would check " & form.ip_addr & " here." />
 </cfif>
 <html>
     <body>
@@ -11,7 +11,7 @@
                     <td><input type="text" id="ip_addr" name="ip_addr"/></td>
                 </tr>
                 <tr>
-                    <td><input type="submit" value="submit"/></td>
+                    <td><input type="submit" name="submit" value="submit"/></td>
                 </tr> 
             </table>
         </form>
