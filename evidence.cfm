@@ -12,6 +12,9 @@
 <html>
     <body>
         <h1>Evidence File for #check.address#/#check.cidr#</h1>
+        <cfloop from="1" to="35" index="i">
+            #mid(evidence.evidence,i,1)# #asc(mid(evidence.evidence,i,1))#<br />
+        </cfloop>
         #evidence.evidence#
     </body>
 </html>
