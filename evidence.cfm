@@ -11,7 +11,7 @@
 <cfoutput>
 <html>
     <body>
-        <h1>Evidence File for #ip.address#/#ip.cidr#</h1>
+        <h1>Evidence File for #check.address#/#check.cidr#</h1>
         <p>#evidence.evidence#</p>
     </body>
 </html>
