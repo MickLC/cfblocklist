@@ -12,7 +12,7 @@
 <html>
     <body>
         <h1>Evidence File for #check.address#/#check.cidr#</h1>
-        #replace(replace(evidence.evidence,"<","#chr(60)#","all"),"#chr(10)#","<br />","all")#
+        #replace(replace(evidence.evidence,"<","$lt;","all"),"#chr(10)#","<br />","all")#
     </body>
 </html>
 </cfoutput>
