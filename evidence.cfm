@@ -12,7 +12,7 @@
 <html>
     <body>
         <h1>Evidence File for #check.address#/#check.cidr#</h1>
-        <p>#evidence.evidence#</p>
+        #evidence.evidence#
     </body>
 </html>
 </cfoutput>
