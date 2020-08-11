@@ -6,7 +6,7 @@
 </cfquery>
 <cfquery datasource="blocklist" name="evidence">
     SELECT * FROM evidence
-    WHERE ip_id = check.id
+    WHERE ip_id = #check.id#
 </cfquery>
 <cfoutput>
 <html>
