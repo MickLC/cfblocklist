@@ -23,7 +23,7 @@
         </form>
         <cfif isDefined("testresult")>
             <cfoutput>#testresult#</cfoutput>
-            <cfdump var="check" />
+            <cfdump var="#check#" />
         </cfif>
     </body>
 </html>
