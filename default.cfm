@@ -1,5 +1,11 @@
 <cfif isDefined("form.submit")>
     <cfset testresult = "<br />We would check " & form.ip_addr & " here." />
+    <cfquery datasource="blocklist" name="check">
+        SELECT * FROM ip 
+        WHERE address = '#form.ip_addr#'
+        OR INET_ATON('#form.ip_addr#') BETWEEN 
+        INET_ATON(address) AND INET_ATON(address) + POW(2,32-CIDR) - 1;
+    </cfquery>
 </cfif>
 <html>
     <body>
@@ -17,6 +23,7 @@
         </form>
         <cfif isDefined("testresult")>
             <cfoutput>#testresult#</cfoutput>
+            <cfdump var="check" />
         </cfif>
     </body>
 </html>
