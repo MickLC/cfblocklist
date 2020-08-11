@@ -25,6 +25,7 @@
             <cfif isDefined("testresult")>
                 <cfif check.recordCount is not 0>
                     <cfdump var="#check#" />
+                    There is a current entry for <a href="/evidence.cfm?ip=#check.address#">#form.ip_addr#</a>.
                 <cfelse>
                     There is no current entry for #form.ip_addr#
                 </cfif>
