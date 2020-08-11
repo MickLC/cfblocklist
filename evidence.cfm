@@ -4,6 +4,9 @@
     OR INET_ATON('#url.ip#') BETWEEN 
     INET_ATON(address) AND INET_ATON(address) + POW(2,32-CIDR) - 1;
 </cfquery>
+<cfif check.recordCount is 0>
+    <cflocation url="/" addtoken="no" />
+</cfif>
 <cfquery datasource="blocklist" name="evidence">
     SELECT * FROM evidence
     WHERE ip_id = #check.id#
