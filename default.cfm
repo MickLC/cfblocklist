@@ -1,5 +1,5 @@
 <cfif isDefined("form.submit")>
-    <cfset testresult = "<br />We would check " & form.ip_addr & " here." />
+    <cfset testresult = "Y" />
     <cfquery datasource="blocklist" name="check">
         SELECT * FROM ip 
         WHERE address = '#form.ip_addr#'
@@ -22,8 +22,11 @@
             </table>
         </form>
         <cfif isDefined("testresult")>
-            <cfoutput>#testresult#</cfoutput>
-            <cfdump var="#check#" />
+            <cfif check.recordCount is not 0>
+                <cfdump var="#check#" />
+            <cfelse>
+                There is no current entry for #form.ip_addr#
+            </cfif>
         </cfif>
     </body>
 </html>
