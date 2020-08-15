@@ -19,19 +19,9 @@
         values
         ('#form.username#','#generateHash(form.password1)#',10000)
     </cfquery>
-    <html>
-        <body>
-            Insert just happened.
-        </body>
-    </html>
-    <!--- <cflocation url="/admin/" addtoken="no" /> --->
+    <cflocation url="/admin/" addtoken="no" />
 <cfelseif any_users.numRows GT 0>
-    <html>
-        <body>
-            CFElseIf part of loop
-        </body>
-    </html>
-    <!--- <cflocation url="/" addtoken="no" /> --->
+    <cflocation url="/" addtoken="no" />
 <cfelse>
     <html>
         <head>
@@ -77,7 +67,7 @@
         </head>
         <body>
             <p>Please create your first user.</p>
-            <form action="." id="inituser" method="POST">
+            <form action="/initialize.cfm" id="inituser" method="POST">
                 <table>
                     <tr><td>Username: <input type="text" id="username" name="username" size="32" maxlength="64" /></td></tr>
                     <tr><td>Password: <input type="password" id="password1" name="password1" size="32" /></td></tr>
