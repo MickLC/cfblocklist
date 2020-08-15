@@ -19,9 +19,19 @@
         values
         ('#form.username#','#generateHash(form.password1)#',10000)
     </cfquery>
-    <cflocation url="/admin/" addtoken="no" />
+    <html>
+        <body>
+            Insert just happened.
+        </body>
+    </html>
+    <!--- <cflocation url="/admin/" addtoken="no" /> --->
 <cfelseif any_users.numRows GT 0>
-    <cflocation url="/" addtoken="no" />
+    <html>
+        <body>
+            CFElseIf part of loop
+        </body>
+    </html>
+    <!--- <cflocation url="/" addtoken="no" /> --->
 <cfelse>
     <html>
         <head>
