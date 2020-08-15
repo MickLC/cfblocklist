@@ -23,11 +23,11 @@
 					required: true,
 					minlength: 2
 				},
-				password: {
+				password1: {
 					required: true,
 					minlength: 5
 				},
-				confirm_password: {
+				password2: {
 					required: true,
 					minlength: 5,
 					equalTo: "#password1"
