@@ -73,7 +73,7 @@
         </head>
         <body>
             <p>Please create your first user.</p>
-            <form action="." method="POST" name="inituser">
+            <form action="." id="inituser" method="POST">
                 <table>
                     <tr><td>Username: <input type="text" id="username" name="username" size="32" maxlength="64" /></td></tr>
                     <tr><td>Password: <input type="password" id="password1" name="password1" size="32" /></td></tr>
