@@ -75,9 +75,9 @@
             <p>Please create your first user.</p>
             <form action="." method="POST" name="inituser">
                 <table>
-                    <tr><td>Username: <input type="text" name="username" size="32" maxlength="64" /></td></tr>
-                    <tr><td>Password: <input type="password" name="password1" size="32" /></td></tr>
-                    <tr><td>Retype password: <input type="password" name="password2" size="32" /></td></tr>
+                    <tr><td>Username: <input type="text" id="username" name="username" size="32" maxlength="64" /></td></tr>
+                    <tr><td>Password: <input type="password" id="password1" name="password1" size="32" /></td></tr>
+                    <tr><td>Retype password: <input type="password" id="password2" name="password2" size="32" /></td></tr>
                     <tr><td><input type="submit" value="Submit" name="submit" /></td></tr>
                 </table>
             </form>
