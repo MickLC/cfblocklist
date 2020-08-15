@@ -14,7 +14,7 @@
 </cfquery>
 <cfif any_users.numRows GT 0>
     <cflocation url="/" addtoken="no" />
-<cfelseif isDefined(form.submit)>
+<cfelseif isDefined("form.submit")>
     <cfquery datasource="blocklist" name="insertfirstuser">
         insert into login
         (name,password,access_level)
