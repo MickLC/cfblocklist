@@ -12,9 +12,7 @@
     select count(*) as numRows
     from login
 </cfquery>
-<cfif any_users.numRows GT 0>
-    <cflocation url="/" addtoken="no" />
-<cfelseif isDefined("form.submit")>
+<cfif isDefined("form.submit")>
     <cfquery datasource="blocklist" name="insertfirstuser">
         insert into login
         (name,password,access_level)
@@ -22,6 +20,8 @@
         ('#form.username#','#generateHash(form.password1)#',10000)
     </cfquery>
     <cflocation url="/admin/" addtoken="no" />
+<cfelseif any_users.numRows GT 0>
+    <cflocation url="/" addtoken="no" />
 <cfelse>
     <html>
         <head>
