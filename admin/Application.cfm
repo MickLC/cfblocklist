@@ -1,4 +1,4 @@
-<cfinclude name="/config/pepper.cfm">
+<cfinclude template="/config/pepper.cfm" runonce="true">
 <cfscript>
     function checkPassword(
     required string password,
@@ -6,7 +6,7 @@
     ) {
         var iterations = ListGetAt(arguments.hash, 1, ':');
         var salt = ListGetAt(arguments.hash, 2, ':');
-        return ( generateHash ( arguments.password , salt , iterations ) EQ arguments.hash );
+        return ( generateHash(arguments.password , salt , iterations) EQ arguments.hash );
     }
 </cfscript>
 <cfquery datasource="blocklist" name="any_users">
@@ -17,11 +17,14 @@
     <cfif not isdefined("session.USERAUTH") or session.USERAUTH is "0">
         <cfif isdefined("form.loginpost")>
             <cfquery datasource="reputation" name="auth">
-                select * from login where login.name='#form.username#'
-                and #form.password# = password
+                select * 
+                from login 
+                where login.name='#form.username#'
             </cfquery>
             <cfif auth.recordcount GT 0>
-                <cfset session.userauth = #auth.access_level#>
+                <cfif checkPassword(#form.password#,#auth.password#) EQ "true">
+                    <cfset session.userauth = #auth.access_level#>
+                </cfif>
             <cfelse>
                 <cfset session.userauth = 0>
                 Not authorized.

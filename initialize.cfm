@@ -1,4 +1,4 @@
-<cfinclude name="/config/pepper.cfm">
+<cfinclude template="/config/pepper.cfm" runonce="true">
 <cfscript>
     function generateHash(
         required string password,
