@@ -22,7 +22,7 @@
         ('#form.username#','#generateHash(form.password1)#',10000)
     </cfquery>
     <cflocation url="/admin/" addtoken="no" />
-</cfelse>
+<cfelse>
     <html>
         <head>
             <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
