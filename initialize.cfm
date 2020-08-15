@@ -8,49 +8,6 @@
         return arguments.iterations & ':' & arguments.salt & ':' & GeneratePBKDFkey( 'PBKDF2WithHmacSHA1' , arguments.password1 , arguments.salt & application.pepper , arguments.iterations );
     }
 </cfscript>
-<script>
-	$.validator.setDefaults({
-		submitHandler: function() {
-			alert("submitted!");
-		}
-	});
-
-	$().ready(function() {
-		// validate signup form on keyup and submit
-		$("#inituser").validate({
-			rules: {
-				username: {
-					required: true,
-					minlength: 2
-				},
-				password1: {
-					required: true,
-					minlength: 5
-				},
-				password2: {
-					required: true,
-					minlength: 5,
-					equalTo: "#password1"
-				}
-			},
-			messages: {
-				username: {
-					required: "Please enter a username",
-					minlength: "Your username must consist of at least 2 characters"
-				},
-				password1: {
-					required: "Please provide a password",
-					minlength: "Your password must be at least 5 characters long"
-				},
-				password2: {
-					required: "Please provide a password",
-					minlength: "Your password must be at least 5 characters long",
-					equalTo: "Please enter the same password as above"
-				}
-			}
-		});
-	});
-	</script>
 <cfquery datasource="blocklist" name="any_users">
     select count(*) as numRows
     from login
@@ -70,6 +27,49 @@
         <head>
             <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
             <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.19.1/jquery.validate.min.js"></script>
+            <script>
+                $.validator.setDefaults({
+                    submitHandler: function() {
+                        alert("submitted!");
+                    }
+                });
+            
+                $().ready(function() {
+                    // validate signup form on keyup and submit
+                    $("#inituser").validate({
+                        rules: {
+                            username: {
+                                required: true,
+                                minlength: 2
+                            },
+                            password1: {
+                                required: true,
+                                minlength: 5
+                            },
+                            password2: {
+                                required: true,
+                                minlength: 5,
+                                equalTo: "#password1"
+                            }
+                        },
+                        messages: {
+                            username: {
+                                required: "Please enter a username",
+                                minlength: "Your username must consist of at least 2 characters"
+                            },
+                            password1: {
+                                required: "Please provide a password",
+                                minlength: "Your password must be at least 5 characters long"
+                            },
+                            password2: {
+                                required: "Please provide a password",
+                                minlength: "Your password must be at least 5 characters long",
+                                equalTo: "Please enter the same password as above"
+                            }
+                        }
+                    });
+                });
+            </script>
         </head>
         <body>
             <p>Please create your first user.</p>
