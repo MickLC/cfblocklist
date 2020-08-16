@@ -11,14 +11,12 @@
         <h3>Current Listings</h3>
         <cfoutput>
             <form action="/admin/edit.cfm" method="POST">
-                <input name="ip" type="text" list="comboid">
-					<datalist id="comboid">
-						<cfloop index="i" from="1" to="#currentlist.recordCount#">
-							<cfoutput>
-								<option value="#currentlist.id#">#currentlist.address#/#currentlist.cidr# (#currentlist.reason_text#)</option>
-							</cfoutput>
-						</cfloop>
-					</datalist>
+                <label for="ip">Current entries:</label>
+                <select name="ip" id="ip">
+                    <cfloop query="currentlist">
+                        <option value="#currentlist.id#">#currentlist.address#/#currentlist.cidr# (#currentlist.reason_text#)</option>
+                    </cfloop>
+                </select>
 				<input type="submit" name="submit" value="Submit">
             </form>
         </cfoutput>
