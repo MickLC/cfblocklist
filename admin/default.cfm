@@ -10,7 +10,7 @@
     where i.reason_id = r.id
 </cfquery>
 <cfquery name="reason" dbtype="query">
-    select count(*), reason_text
+    select count(*) as hits, reason_text
     from stats
     group by reason_text
     order by count(*) desc
@@ -35,7 +35,7 @@
         <table>
             <tr>
                 <th>Most common reason:</th>
-                <td><cfoutput>#reason.reason_text# (#reason.count(*)#)</cfoutput></td>
+                <td><cfoutput>#reason.reason_text# (#reason.hits#)</cfoutput></td>
             </tr>
             <tr>
                 <th>Next 10 to expire:</th>
