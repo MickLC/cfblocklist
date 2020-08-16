@@ -13,7 +13,7 @@
     select count(*), reason_text
     from stats
     group by reason_text
-    order by 1 desc
+    order by count(*) desc
     limit 1
 </cfquery>
 <html>
