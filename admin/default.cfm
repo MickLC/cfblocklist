@@ -2,7 +2,7 @@
     SELECT i.id, i.address, i.cidr, r.reason_text
     FROM ip i, reason r
     WHERE i.reason_id = r.id
-    ORDER BY i.address
+    ORDER BY INET_ATON(i.address)
 </cfquery>
 <html>
     <body>
@@ -16,7 +16,7 @@
                     <cfloop query="currentlist">
                         <option value="#currentlist.id#">#currentlist.address#/#currentlist.cidr# (#currentlist.reason_text#)</option>
                     </cfloop>
-                </select>
+                </select><br />
 				<input type="submit" name="submit" value="Submit">
             </form>
         </cfoutput>
