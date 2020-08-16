@@ -14,7 +14,6 @@
     from stats
     group by reason_text
     order by count(*) desc
-    limit 1
 </cfquery>
 <html>
     <body>
