@@ -16,7 +16,7 @@
 <cfif any_users.numRows GT 0>
     <cfif not isdefined("session.USERAUTH") or session.USERAUTH is "0">
         <cfif isdefined("form.loginpost")>
-            <cfquery datasource="reputation" name="auth">
+            <cfquery datasource="blocklist" name="auth">
                 select * 
                 from login 
                 where login.name='#form.username#'
