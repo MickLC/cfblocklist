@@ -8,6 +8,13 @@
         var salt = ListGetAt(arguments.hash, 2, ':');
         return ( generateHash(arguments.password , salt , iterations) EQ arguments.hash );
     }
+    function generateHash(
+        required string password,
+        string salt = GenerateSecretKey( 'AES' , '256' ),
+        numeric iterations = randRange( 50000 , 100000 , 'SHA1PRNG' )
+    ) {
+        return arguments.iterations & ':' & arguments.salt & ':' & GeneratePBKDFkey( 'PBKDF2WithHmacSHA1' , arguments.password , arguments.salt & application.pepper , arguments.iterations );
+    }
 </cfscript>
 <cfquery datasource="blocklist" name="any_users">
     select count(*) as numRows
