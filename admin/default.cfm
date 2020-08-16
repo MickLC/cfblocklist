@@ -35,7 +35,7 @@
         <table>
             <tr>
                 <th>Most common reason:</th>
-                <td><cfoutput query="reason">#reason.reason_text#</cfoutput></td>
+                <td><cfoutput>#reason.reason_text# (#reason.count(*)#)</cfoutput></td>
             </tr>
             <tr>
                 <th>Next 10 to expire:</th>
