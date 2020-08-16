@@ -15,7 +15,7 @@
 					<datalist id="comboid">
 						<cfloop index="i" from="1" to="#currentlist.recordCount#">
 							<cfoutput>
-								<option value="#currentlist.id#">#currentlist.ip#/#currentlist.cidr# (#currentlist.reason_text#)</option>
+								<option value="#currentlist.id#">#currentlist.address#/#currentlist.cidr# (#currentlist.reason_text#)</option>
 							</cfoutput>
 						</cfloop>
 					</datalist>
