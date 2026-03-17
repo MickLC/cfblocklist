@@ -1,0 +1,19 @@
+# cfblocklist .gitignore
+
+# NEVER commit the pepper file — it's a secret
+config/pepper.cfm
+
+# Lucee / ColdFusion runtime artifacts
+*.cfswc
+*.cfswc.settings
+*.lock
+WEB-INF/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.idea/
+.vscode/
+*.swp
