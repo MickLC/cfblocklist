@@ -170,12 +170,9 @@ Go to `/admin/` and log in with the credentials created in step 6.
 
 ## Security notes
 
-- The pepper never touches the web root in either supported configuration
-- `config/pepper.cfm` is an inert comment stub — safe to commit
 - All database queries use `cfqueryparam` — no string interpolation into SQL
 - All output uses `encodeForHTML()` — no raw variable output
 - Admin session timeout is 4 hours; sessions are stored server-side
-- The `Application.cfm` auth guard protects all `/admin/*` routes automatically
 - The delist action requires a POST confirmation step before removing any entry
 - Locked entries cannot be delisted by any public action
 
