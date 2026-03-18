@@ -32,8 +32,16 @@ function verifyHash(required string password, required string stored) {
         iterations,
         256
     );
-    // Constant-time comparison
-    return (derived == expected);
+    // Constant-time comparison via java.security.MessageDigest.isEqual().
+    // A plain == check is vulnerable to timing attacks: the JVM short-circuits
+    // as soon as it finds the first differing character, leaking information
+    // about how much of the hash matched. MessageDigest.isEqual() always
+    // compares every byte regardless of where a mismatch occurs.
+    var jMD = createObject("java", "java.security.MessageDigest");
+    return jMD.isEqual(
+        derived.getBytes("UTF-8"),
+        expected.getBytes("UTF-8")
+    );
 }
 
 // ── Input sanitisation ────────────────────────────────────────────────────

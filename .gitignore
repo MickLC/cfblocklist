@@ -1,7 +1,10 @@
 # cfblocklist .gitignore
 
-# NEVER commit the pepper file — it's a secret
-config/pepper.cfm
+# The pepper flat file (if you use Tier 3 flat-file method).
+# The actual filename/path is whatever you set in application.pepperFile —
+# add it here if it falls inside the project directory for any reason.
+# Example:
+# secrets/pepper.txt
 
 # Lucee / ColdFusion runtime artifacts
 *.cfswc

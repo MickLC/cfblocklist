@@ -1,0 +1,12 @@
+# Deny direct HTTP access to all files in this directory.
+# ColdFusion/Lucee cfinclude can still read these files server-side;
+# this only blocks browser requests routed through Apache.
+<IfModule mod_authz_core.c>
+    # Apache 2.4+
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    # Apache 2.2
+    Order deny,allow
+    Deny from all
+</IfModule>

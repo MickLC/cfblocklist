@@ -17,6 +17,29 @@ ColdFusion/Lucee front-end for a DNSBL (DNS-based Block List) backed by MariaDB 
 - Lucee 5.x or 6.x
 - MariaDB 10.x (the `blocklist` datasource must be configured in Lucee admin)
 - rbldnsd running on the same server (or reachable via the reload script)
+- No root or sudo required for any part of the setup
+
+
+## Web server configuration
+
+### Apache
+
+The `config/.htaccess` file included in the project blocks direct HTTP access
+to the `config/` directory automatically. No additional configuration needed.
+
+### Nginx
+
+Nginx ignores `.htaccess` files. Add the following to your server block to
+block direct access to `config/`:
+
+```nginx
+location ^~ /config/ {
+    deny all;
+    return 403;
+}
+```
+
+Place this block **before** your main `location` block so it takes precedence.
 
 ## Installation
 
@@ -27,13 +50,46 @@ The web root should be the directory containing `Application.cfm`.
 
 ### 2. Configure the pepper
 
+The pepper is a secret value mixed into every password hash. It must live
+**outside the web root** so it cannot be served to a browser.
+
+Generate a value first:
+
 ```bash
-# Generate a random pepper
 openssl rand -hex 32
 ```
 
-Edit `config/pepper.cfm` and replace the placeholder value with your generated string.
-**Never commit this file. It is in `.gitignore` by default.**
+Then configure it using **one** of these methods — no root or sudo needed:
+
+#### Option A — Environment variable (preferred)
+
+Add to `{lucee-install}/tomcat/bin/setenv.sh`:
+
+```bash
+export BLOCKLIST_PEPPER="your-generated-hex-string"
+```
+
+Restart Lucee after editing. No root needed if you own the Lucee installation.
+
+#### Option B — Flat file above the web root
+
+Create a plain-text file **outside** your web root containing only the pepper value:
+
+```bash
+# Example: web root is /home/youruser/public_html
+mkdir -p /home/youruser/.blocklist
+echo "your-generated-hex-string" > /home/youruser/.blocklist/pepper.txt
+chmod 600 /home/youruser/.blocklist/pepper.txt
+```
+
+Then set the path in `config/settings.cfm`:
+
+```coldfusion
+application.pepperFile = "/home/youruser/.blocklist/pepper.txt";
+```
+
+The application checks Option A first, then Option B. If neither is configured
+it displays a clear setup error page and refuses to start.
 
 ### 3. Run the schema migration
 
@@ -41,19 +97,21 @@ Edit `config/pepper.cfm` and replace the placeholder value with your generated s
 mysql -h <your-db-host> -u <user> -p blocklist < schema.sql
 ```
 
-This is idempotent — safe to run against an existing database.
+Safe to run against an existing database — all statements are idempotent.
 
 ### 4. Configure site settings
 
-Edit `config/settings.cfm`:
+Edit `config/settings.cfm` (safe to commit — contains no secrets):
 
 | Setting | Description |
 |---|---|
 | `application.siteName` | Display name shown in headers |
 | `application.siteURL` | Canonical base URL (no trailing slash) |
 | `application.adminEmail` | Admin contact / delist notification recipient |
-| `application.rbldnsdReloadScript` | Path to reload script; set to `""` to disable |
+| `application.dnsZone` | Your rbldnsd zone name (used in About page examples) |
+| `application.rbldnsdReloadScript` | Path to reload script; `""` to disable |
 | `application.delistNotifyAdmin` | `true` to email admin on every self-delist |
+| `application.pepperFile` | Full path to pepper file (Option B above); `""` if unused |
 
 ### 5. Set up the rbldnsd reload script
 
@@ -62,23 +120,13 @@ cp reload-rbldnsd.sh /opt/blocklist/reload-rbldnsd.sh
 chmod +x /opt/blocklist/reload-rbldnsd.sh
 ```
 
-Allow the Lucee service user to run it without a password:
-
-```
-# /etc/sudoers.d/blocklist
-lucee ALL=(root) NOPASSWD: /opt/blocklist/reload-rbldnsd.sh
-```
-
-Update `application.rbldnsdReloadScript` in `config/settings.cfm` to:
-```
-/usr/bin/sudo /opt/blocklist/reload-rbldnsd.sh
-```
+No sudo needed if the Lucee service user owns the rbldnsd process.
+See the comments inside the script if a sudo rule is required for your setup.
 
 ### 6. Create the first admin user
 
-Navigate to `/initialize.cfm` in a browser.
-This page creates the first admin user and then permanently redirects away once
-a user exists.
+Navigate to `/initialize.cfm` in a browser. This page creates the first admin
+user and permanently redirects away once a user exists.
 
 ### 7. Log in
 
@@ -88,19 +136,18 @@ Go to `/admin/` and log in with the credentials created in step 6.
 
 ```
 /
-├── Application.cfm          # Lucee application bootstrap + auth guard
+├── Application.cfm          # Lucee bootstrap, pepper resolution, auth guard
 ├── default.cfm              # Public homepage / lookup
 ├── evidence.cfm             # Public evidence display
 ├── delist.cfm               # One-click self-delist handler
 ├── about.cfm                # Public about/policy page
-├── initialize.cfm           # First-run admin user creation (keep from original)
-├── schema.sql               # MariaDB schema + migration
+├── initialize.cfm           # First-run admin user creation
+├── schema.sql               # MariaDB schema + migration (idempotent)
 ├── reload-rbldnsd.sh        # rbldnsd SIGHUP reload script
 ├── .gitignore
 │
 ├── config/
-│   ├── settings.cfm         # Site-wide configuration
-│   └── pepper.cfm           # Password pepper — NOT in git
+│   └── settings.cfm         # Site configuration (committed, no secrets)
 │
 ├── includes/
 │   ├── functions.cfm        # Shared utility functions
@@ -111,25 +158,26 @@ Go to `/admin/` and log in with the credentials created in step 6.
 │   └── error.cfm            # Global error handler
 │
 └── admin/
-    ├── index.cfm            # Dashboard (stats, recent entries, recent audit)
-    ├── login.cfm            # Admin login form
+    ├── index.cfm            # Dashboard
+    ├── login.cfm            # Admin login
     ├── logout.cfm           # Session destroy
-    ├── entries.cfm          # Paginated entry list + inline lock/unlock/delete
-    ├── entry_add.cfm        # Add new entry + initial evidence
-    ├── entry_edit.cfm       # Edit entry: evidence records, lock status
-    ├── audit.cfm            # Full audit log with filters
+    ├── entries.cfm          # Entry list + inline lock/unlock/delete
+    ├── entry_add.cfm        # Add entry + initial evidence
+    ├── entry_edit.cfm       # Edit entry: evidence, lock status
+    ├── audit.cfm            # Audit log
     └── users.cfm            # Admin user management
 ```
 
 ## Security notes
 
-- `config/pepper.cfm` must never be committed to version control
+- The pepper never touches the web root in either supported configuration
+- `config/pepper.cfm` is an inert comment stub — safe to commit
 - All database queries use `cfqueryparam` — no string interpolation into SQL
 - All output uses `encodeForHTML()` — no raw variable output
 - Admin session timeout is 4 hours; sessions are stored server-side
 - The `Application.cfm` auth guard protects all `/admin/*` routes automatically
 - The delist action requires a POST confirmation step before removing any entry
-- Locked entries cannot be delisted by any public action regardless of URL manipulation
+- Locked entries cannot be delisted by any public action
 
 ## License
 
