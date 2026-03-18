@@ -1,7 +1,6 @@
 <!---
     admin/entry_add.cfm  —  Add a new blocklist entry with evidence
 --->
-<cfinclude template="/config/pepper.cfm">
 <cfinclude template="/config/settings.cfm">
 <cfinclude template="/includes/functions.cfm">
 <cfset requireLogin()>

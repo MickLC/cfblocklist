@@ -5,9 +5,14 @@
 <div class="alert alert-danger">
     <h4 class="alert-heading">An error occurred</h4>
     <p>Something went wrong. Please try again or contact the administrator.</p>
-    <cfif isDefined("error") && cgi.server_name contains "local">
+    <cfif isDefined("error")>
         <hr>
-        <pre class="mb-0 small"><cfoutput>#encodeForHTML(error.message)#</cfoutput></pre>
+        <p class="mb-1 small fw-bold">Error message:</p>
+        <pre class="mb-2 small"><cfoutput>#encodeForHTML(error.message)#</cfoutput></pre>
+        <p class="mb-1 small fw-bold">Detail:</p>
+        <pre class="mb-2 small"><cfoutput>#encodeForHTML(error.detail)#</cfoutput></pre>
+        <p class="mb-1 small fw-bold">Template:</p>
+        <pre class="mb-0 small"><cfoutput>#encodeForHTML(error.template)#</cfoutput></pre>
     </cfif>
 </div>
 <a href="/" class="btn btn-secondary">Return to Home</a>

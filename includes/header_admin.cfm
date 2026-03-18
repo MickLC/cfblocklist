@@ -55,7 +55,7 @@
         <ul class="nav flex-column">
             <li class="nav-section">Dashboard</li>
             <li class="nav-item">
-                <a class="nav-link <cfif cgi.script_name contains '/admin/index'>active</cfif>" href="/admin/">Overview</a>
+                <a class="nav-link <cfif cgi.script_name contains '/admin/default'>active</cfif>" href="/admin/">Overview</a>
             </li>
             <li class="nav-section">Entries</li>
             <li class="nav-item">

@@ -1,7 +1,6 @@
 <!---
     about.cfm  —  Public about/policy page explaining the DNSBL
 --->
-<cfinclude template="/config/pepper.cfm">
 <cfinclude template="/config/settings.cfm">
 <cfinclude template="/includes/functions.cfm">
 <cfparam name="attributes.pageTitle" default="About">

@@ -1,7 +1,6 @@
 <!---
     admin/login.cfm  —  Admin login form
 --->
-<cfinclude template="/config/pepper.cfm">
 <cfinclude template="/config/settings.cfm">
 <cfinclude template="/includes/functions.cfm">
 

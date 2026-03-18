@@ -6,7 +6,6 @@
     Sets active = 0 (preserves entry and evidence in DB) rather than hard-deleting.
     Locked entries redirect back to evidence page with an error.
 --->
-<cfinclude template="/config/pepper.cfm">
 <cfinclude template="/config/settings.cfm">
 <cfinclude template="/includes/functions.cfm">
 

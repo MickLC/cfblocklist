@@ -1,7 +1,6 @@
 <!---
     admin/entry_edit.cfm  —  Edit a blocklist entry (evidence, lock status, add more evidence)
 --->
-<cfinclude template="/config/pepper.cfm">
 <cfinclude template="/config/settings.cfm">
 <cfinclude template="/includes/functions.cfm">
 <cfset requireLogin()>
@@ -186,7 +185,7 @@ displayEntry = entry.entry_type EQ "cidr"
                     <dd class="col-7">
                         <cfoutput>
                         <span class="badge
-                            <cfif entry.entry_type EQ 'hostname'>text-white" style="background:#6f42c1
+                            <cfif entry.entry_type EQ 'hostname'>text-white" style="background:##6f42c1
                             <cfelseif entry.entry_type EQ 'cidr'>bg-primary
                             <cfelse>bg-info text-dark</cfif>">
                             #uCase(entry.entry_type)#

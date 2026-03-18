@@ -1,7 +1,6 @@
 <!---
     default.cfm  —  Public homepage: DNSBL explanation + IP/hostname lookup
 --->
-<cfinclude template="/config/pepper.cfm">
 <cfinclude template="/config/settings.cfm">
 <cfinclude template="/includes/functions.cfm">
 
@@ -134,7 +133,7 @@
                                 <dd class="col-sm-9">
                                     <cfoutput>
                                     <span class="badge
-                                        <cfif checkResult.entry_type EQ 'hostname'>bg-purple text-white" style="background:#6f42c1
+                                        <cfif checkResult.entry_type EQ 'hostname'>bg-purple text-white" style="background:##6f42c1
                                         <cfelseif checkResult.entry_type EQ 'cidr'>bg-primary
                                         <cfelse>bg-info text-dark</cfif>">
                                         #uCase(checkResult.entry_type)#

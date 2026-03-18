@@ -1,7 +1,6 @@
 <!---
     admin/audit.cfm  —  Full audit log with filtering and pagination
 --->
-<cfinclude template="/config/pepper.cfm">
 <cfinclude template="/config/settings.cfm">
 <cfinclude template="/includes/functions.cfm">
 <cfset requireLogin()>

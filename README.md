@@ -101,7 +101,16 @@ Safe to run against an existing database — all statements are idempotent.
 
 ### 4. Configure site settings
 
-Edit `config/settings.cfm` (safe to commit — contains no secrets):
+Copy the example settings file and edit it:
+
+```bash
+cp config/settings.example.cfm config/settings.cfm
+```
+
+`config/settings.cfm` is in `.gitignore` — your local values stay local.
+`config/settings.example.cfm` is the committed template with neutral defaults.
+
+Values to set:
 
 | Setting | Description |
 |---|---|
@@ -147,7 +156,8 @@ Go to `/admin/` and log in with the credentials created in step 6.
 ├── .gitignore
 │
 ├── config/
-│   └── settings.cfm         # Site configuration (committed, no secrets)
+│   ├── settings.cfm         # Your local config — gitignored, never committed
+│   └── settings.example.cfm  # Committed template with neutral defaults
 │
 ├── includes/
 │   ├── functions.cfm        # Shared utility functions
@@ -158,7 +168,7 @@ Go to `/admin/` and log in with the credentials created in step 6.
 │   └── error.cfm            # Global error handler
 │
 └── admin/
-    ├── index.cfm            # Dashboard
+    ├── default.cfm          # Dashboard
     ├── login.cfm            # Admin login
     ├── logout.cfm           # Session destroy
     ├── entries.cfm          # Entry list + inline lock/unlock/delete

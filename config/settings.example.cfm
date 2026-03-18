@@ -6,16 +6,16 @@
 --->
 <cfscript>
 // ── Site identity ──────────────────────────────────────────────────────────
-application.siteName    = "Whizardries DNSBL";
+application.siteName    = "My DNSBL";
 application.siteTagline = "DNS-based Block List for spam and abuse sources";
-application.siteURL     = "https://block.whizardries.com"; // no trailing slash
-application.adminEmail  = "block-admin@whizardries.com";
+application.siteURL     = "https://bl.example.com"; // no trailing slash
+application.adminEmail  = "admin@example.com";
 application.contactText = "If you believe your listing is in error, use the lookup below.";
 
 // ── DNS zone ────────────────────────────────────────────────────────────────
 // The zone name rbldnsd answers for. Shown in the public About page
 // in dig / Postfix configuration examples.
-application.dnsZone = "block.whizardries.com";
+application.dnsZone = "bl.example.com";
 
 // ── Pepper flat-file path ───────────────────────────────────────────────────
 // If you are storing the pepper in a file above the web root, set the full
@@ -24,7 +24,7 @@ application.dnsZone = "block.whizardries.com";
 // The file must be outside the web root — e.g. one directory above it.
 // Leave as "" if you are using the environment variable method instead.
 // See Application.cfm for full setup instructions.
-application.pepperFile = "/var/www/.blocklist/pepper.txt";
+application.pepperFile = "";
 // Example: application.pepperFile = "/home/youruser/.blocklist/pepper.txt";
 
 // ── rbldnsd reload ─────────────────────────────────────────────────────────

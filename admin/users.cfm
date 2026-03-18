@@ -1,7 +1,6 @@
 <!---
     admin/users.cfm  —  Admin user management (add, deactivate, reset password)
 --->
-<cfinclude template="/config/pepper.cfm">
 <cfinclude template="/config/settings.cfm">
 <cfinclude template="/includes/functions.cfm">
 <cfset requireLogin()>

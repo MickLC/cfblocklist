@@ -2,7 +2,6 @@
     evidence.cfm  —  Public evidence display for a blocklist entry
     URL param: ?id=<integer>
 --->
-<cfinclude template="/config/pepper.cfm">
 <cfinclude template="/config/settings.cfm">
 <cfinclude template="/includes/functions.cfm">
 
@@ -66,7 +65,7 @@ switch (entry.entry_type) {
                     <span class="font-monospace fw-bold fs-5"><cfoutput>#encodeForHTML(displayEntry)#</cfoutput></span>
                     <cfoutput>
                     <span class="badge ms-2
-                        <cfif entry.entry_type EQ 'hostname'>text-white" style="background:#6f42c1
+                        <cfif entry.entry_type EQ 'hostname'>text-white" style="background:##6f42c1
                         <cfelseif entry.entry_type EQ 'cidr'>bg-primary
                         <cfelse>bg-info text-dark</cfif>">
                         #uCase(entry.entry_type)#
