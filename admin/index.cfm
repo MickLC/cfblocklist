@@ -14,7 +14,9 @@
         SUM(CASE WHEN locked  = 0 THEN 1 ELSE 0 END)   AS unlocked_count,
         SUM(CASE WHEN entry_type = 'ip'       THEN 1 ELSE 0 END) AS ip_count,
         SUM(CASE WHEN entry_type = 'cidr'     THEN 1 ELSE 0 END) AS cidr_count,
-        SUM(CASE WHEN entry_type = 'hostname' THEN 1 ELSE 0 END) AS hostname_count
+        SUM(CASE WHEN entry_type = 'hostname' THEN 1 ELSE 0 END) AS hostname_count,
+        SUM(CASE WHEN active = 1 THEN 1 ELSE 0 END) AS active_count,
+        SUM(CASE WHEN active = 0 THEN 1 ELSE 0 END) AS inactive_count
     FROM ip
 </cfquery>
 
@@ -87,6 +89,24 @@
                     </div>
                 </div>
                 <div class="text-muted small mt-1">By type</div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card text-center shadow-sm h-100">
+            <div class="card-body">
+                <div class="fs-1 fw-bold text-success"><cfoutput>#stats.active_count#</cfoutput></div>
+                <div class="text-muted small">Active (live)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-center shadow-sm h-100">
+            <div class="card-body">
+                <div class="fs-1 fw-bold text-secondary"><cfoutput>#stats.inactive_count#</cfoutput></div>
+                <div class="text-muted small">Inactive (delisted)</div>
             </div>
         </div>
     </div>
@@ -172,7 +192,9 @@
                                 <cfswitch expression="#action#">
                                     <cfcase value="ADD">     <span class="badge bg-success">#action#</span></cfcase>
                                     <cfcase value="DELETE">  <span class="badge bg-danger">#action#</span></cfcase>
-                                    <cfcase value="DELIST">  <span class="badge bg-warning text-dark">#action#</span></cfcase>
+                                    <cfcase value="DELIST">     <span class="badge bg-warning text-dark">#action#</span></cfcase>
+                                    <cfcase value="DEACTIVATE"><span class="badge bg-secondary">#action#</span></cfcase>
+                                    <cfcase value="ACTIVATE">  <span class="badge bg-success">#action#</span></cfcase>
                                     <cfcase value="LOCK">    <span class="badge bg-danger">#action#</span></cfcase>
                                     <cfcase value="UNLOCK">  <span class="badge bg-success">#action#</span></cfcase>
                                     <cfcase value="EDIT">    <span class="badge bg-secondary">#action#</span></cfcase>

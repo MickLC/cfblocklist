@@ -3,6 +3,7 @@
     URL param: ?id=<integer>
 
     No email confirmation required for unlocked entries.
+    Sets active = 0 (preserves entry and evidence in DB) rather than hard-deleting.
     Locked entries redirect back to evidence page with an error.
 --->
 <cfinclude template="/config/pepper.cfm">
@@ -49,9 +50,12 @@ switch (entry.entry_type) {
 
     <!--- Delete the entry (evidence cascades via FK) --->
     <cfquery datasource="#application.dsn#">
-        DELETE FROM ip
+        UPDATE ip
+        SET    active      = <cfqueryparam value="0" cfsqltype="cf_sql_tinyint">,
+               modified_date = NOW()
         WHERE  id     = <cfqueryparam value="#entryId#" cfsqltype="cf_sql_integer">
-          AND  locked  = <cfqueryparam value="0"         cfsqltype="cf_sql_tinyint">
+          AND  locked  = <cfqueryparam value="0"        cfsqltype="cf_sql_tinyint">
+          AND  active  = <cfqueryparam value="1"        cfsqltype="cf_sql_tinyint">
     </cfquery>
 
     <!--- Audit log (no admin session — note as public delist) --->
@@ -70,14 +74,15 @@ switch (entry.entry_type) {
                 from    = "#application.adminEmail#"
                 subject = "Self-delist: #displayEntry# removed from #application.siteName#"
                 type    = "text">
-Self-delist performed via public interface.
+Self-delist performed via public interface. Entry set to inactive (not deleted).
 
 Entry:     #displayEntry#
 Type:      #entry.entry_type#
 Client IP: #cgi.remote_addr#
 Time:      #now()#
 
-No action required unless this was in error.
+The entry and its evidence remain in the database.
+To reactivate, use the admin panel.
             </cfmail>
         <cfcatch>
             <!--- Mail failure is non-fatal --->
@@ -106,6 +111,7 @@ No action required unless this was in error.
                     has been removed from <cfoutput>#encodeForHTML(application.siteName)#</cfoutput>.
                 </p>
                 <p class="small text-muted">
+                    Your listing record is retained for administrative purposes.
                     DNS propagation may take a short time. If you continue to experience issues
                     after 30 minutes, please contact
                     <a href="mailto:<cfoutput>#encodeForHTML(application.adminEmail)#</cfoutput>"><cfoutput>#encodeForHTML(application.adminEmail)#</cfoutput></a>.

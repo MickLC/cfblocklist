@@ -23,7 +23,7 @@
 
 <!--- Fetch entry --->
 <cfquery datasource="#application.dsn#" name="entry">
-    SELECT  i.id, i.entry_type, i.address, i.cidr, i.locked,
+    SELECT  i.id, i.entry_type, i.address, i.cidr, i.locked, i.active,
             i.added_date, i.modified_date,
             l.name AS added_by_name
     FROM    ip i
@@ -46,6 +46,29 @@ displayEntry = entry.entry_type EQ "cidr"
 <cfif len(form.action)>
     <cfswitch expression="#form.action#">
 
+        <!--- Activate / deactivate --->
+        <cfcase value="setactive">
+            <cfset newActive = (form.active EQ "1") ? 1 : 0>
+            <cfquery datasource="#application.dsn#">
+                UPDATE ip
+                SET active       = <cfqueryparam value="#newActive#"         cfsqltype="cf_sql_tinyint">,
+                    modified_by  = <cfqueryparam value="#session.adminId#"   cfsqltype="cf_sql_integer">,
+                    modified_date = NOW()
+                WHERE id = <cfqueryparam value="#entryId#" cfsqltype="cf_sql_integer">
+            </cfquery>
+            <cfset writeAuditLog(
+                action    = (newActive ? "ACTIVATE" : "DEACTIVATE"),
+                target    = displayEntry,
+                entryType = entry.entry_type
+            )>
+            <cfset reloadRbldnsd()>
+            <cfset successMsg = "Active status updated.">
+            <cfquery datasource="#application.dsn#" name="entry">
+                SELECT i.*, l.name AS added_by_name FROM ip i LEFT JOIN login l ON i.added_by = l.id
+                WHERE i.id = <cfqueryparam value="#entryId#" cfsqltype="cf_sql_integer"> LIMIT 1
+            </cfquery>
+        </cfcase>
+
         <!--- Update lock status --->
         <cfcase value="updatelock">
             <cfset newLocked = (form.locked EQ "1") ? 1 : 0>
@@ -64,7 +87,7 @@ displayEntry = entry.entry_type EQ "cidr"
             <cfset successMsg = "Lock status updated.">
             <!--- Refresh entry --->
             <cfquery datasource="#application.dsn#" name="entry">
-                SELECT i.*, l.name AS added_by_name FROM ip i LEFT JOIN login l ON i.added_by = l.id
+                SELECT i.*, l.name AS added_by_name FROM ip i LEFT JOIN login l ON i.added_by = l.id <!--- includes active --->
                 WHERE i.id = <cfqueryparam value="#entryId#" cfsqltype="cf_sql_integer"> LIMIT 1
             </cfquery>
         </cfcase>
@@ -204,6 +227,38 @@ displayEntry = entry.entry_type EQ "cidr"
                         </label>
                     </div>
                     <button type="submit" class="btn btn-sm btn-outline-secondary w-100">Save lock status</button>
+                </form>
+            </div>
+        </div>
+
+        <!--- Active / inactive control --->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header fw-semibold">Listing status</div>
+            <div class="card-body">
+                <p class="small text-muted">
+                    Inactive entries are removed from the live blocklist but
+                    retained in the database with all evidence intact.
+                    Public lookups will not find them.
+                </p>
+                <form method="post" action="/admin/entry_edit.cfm?id=<cfoutput>#encodeForURL(entryId)#</cfoutput>">
+                    <input type="hidden" name="action" value="setactive">
+                    <div class="form-check form-switch mb-3">
+                        <input  class="form-check-input"
+                                type="checkbox"
+                                role="switch"
+                                id="active"
+                                name="active"
+                                value="1"
+                                <cfif entry.active>checked</cfif>>
+                        <label class="form-check-label" for="active">
+                            <cfif entry.active>
+                                <span class="text-success fw-semibold">Active</span> — listed in blocklist
+                            <cfelse>
+                                <span class="text-secondary fw-semibold">Inactive</span> — not in live blocklist
+                            </cfif>
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-outline-secondary w-100">Save listing status</button>
                 </form>
             </div>
         </div>

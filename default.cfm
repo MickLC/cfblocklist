@@ -6,6 +6,8 @@
 <cfinclude template="/includes/functions.cfm">
 
 <cfparam name="form.submit"  default="">
+<cfparam name="url.delisted"  default="">
+<cfparam name="url.q"         default="">
 <cfparam name="form.query"   default="">
 <cfparam name="attributes.pageTitle" default="IP & Domain Lookup">
 
@@ -26,6 +28,7 @@
             SELECT  i.id, i.entry_type, i.address, i.cidr, i.locked, i.added_date
             FROM    ip i
             WHERE   i.entry_type IN ('ip','cidr')
+              AND   i.active = 1
               AND (
                     i.address = <cfqueryparam value="#lookupVal#" cfsqltype="cf_sql_varchar" maxlength="253">
                  OR (
@@ -42,6 +45,7 @@
             SELECT  i.id, i.entry_type, i.address, i.cidr, i.locked, i.added_date
             FROM    ip i
             WHERE   i.entry_type = 'hostname'
+              AND   i.active = 1
               AND (
                     i.address = <cfqueryparam value="#lookupVal#" cfsqltype="cf_sql_varchar" maxlength="253">
                  OR i.address = <cfqueryparam value=".#listRest(lookupVal,'.')#" cfsqltype="cf_sql_varchar" maxlength="253">
@@ -95,7 +99,12 @@
         <!--- ── Results ──────────────────────────────────────────────────── --->
         <cfif searched>
             <div class="mt-3">
-                <cfif isDefined("lookupError")>
+                <cfif url.delisted EQ "1" AND NOT len(form.submit)>
+                    <div class="alert alert-info">
+                        <strong>No longer listed:</strong>
+                        <cfif len(url.q)><cfoutput>#encodeForHTML(url.q)#</cfoutput> is</cfif>
+                        not currently in this blocklist.
+                    </div>
                     <div class="alert alert-warning">
                         <strong>Invalid input:</strong> <cfoutput>#encodeForHTML(lookupError)#</cfoutput>
                     </div>

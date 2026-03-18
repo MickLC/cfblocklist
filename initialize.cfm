@@ -1,80 +1,117 @@
-<cfinclude template="/config/pepper.cfm" runonce="true">
-<cfscript>
-    function generateHash(
-        required string password,
-        string salt = GenerateSecretKey( 'AES' , '256' ),
-        numeric iterations = randRange( 50000 , 100000 , 'SHA1PRNG' )
-    ) {
-        return arguments.iterations & ':' & arguments.salt & ':' & GeneratePBKDFkey( 'PBKDF2WithHmacSHA1' , arguments.password , arguments.salt & application.pepper , arguments.iterations );
-    }
-</cfscript>
-<cfquery datasource="blocklist" name="any_users">
-    select count(*) as numRows
-    from login
+<!---
+    initialize.cfm  —  First-run admin user creation
+    Redirects permanently once any user exists in the login table.
+    Uses the same generateHash() function as the rest of the application
+    (PBKDF2WithHmacSHA256, random salt, random iterations 50k-100k).
+--->
+
+<!--- Application.cfm already loaded settings, functions, and resolved pepper --->
+
+<cfquery datasource="#application.dsn#" name="anyUsers">
+    SELECT COUNT(*) AS numRows FROM login
 </cfquery>
-<cfif isDefined("form.submit")>
-    <cfquery datasource="blocklist" name="insertfirstuser">
-        insert into login
-        (name,password,access_level)
-        values
-        ('#form.username#','#generateHash(form.password1)#',10000)
-    </cfquery>
-    <cflocation url="/admin/" addtoken="no" />
-<cfelseif any_users.numRows GT 0>
-    <cflocation url="/" addtoken="no" />
-<cfelse>
-    <html>
-        <head>
-            <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.19.1/jquery.validate.min.js"></script>
-            <script>
-                $().ready(function() {
-                    // validate signup form on keyup and submit
-                    $("#inituser").validate({
-                        rules: {
-                            username: {
-                                required: true,
-                                minlength: 2
-                            },
-                            password1: {
-                                required: true,
-                                minlength: 5
-                            },
-                            password2: {
-                                required: true,
-                                minlength: 5,
-                                equalTo: "#password1"
-                            }
-                        },
-                        messages: {
-                            username: {
-                                required: "Please enter a username",
-                                minlength: "Your username must consist of at least 2 characters"
-                            },
-                            password1: {
-                                required: "Please provide a password",
-                                minlength: "Your password must be at least 5 characters long"
-                            },
-                            password2: {
-                                required: "Please provide a password",
-                                minlength: "Your password must be at least 5 characters long",
-                                equalTo: "Please enter the same password as above"
-                            }
-                        }
-                    });
-                });
-            </script>
-        </head>
-        <body>
-            <p>Please create your first user.</p>
-            <form action="/initialize.cfm" id="inituser" method="POST">
-                <table>
-                    <tr><td>Username: <input type="text" id="username" name="username" size="32" maxlength="64" /></td></tr>
-                    <tr><td>Password: <input type="password" id="password1" name="password1" size="32" /></td></tr>
-                    <tr><td>Retype password: <input type="password" id="password2" name="password2" size="32" /></td></tr>
-                    <tr><td><input type="submit" value="Submit" name="submit" /></td></tr>
-                </table>
-            </form>
-        </body>
-    </html>
+
+<!--- If users already exist, there's nothing to do here --->
+<cfif anyUsers.numRows GT 0>
+    <cflocation url="/" addtoken="no">
 </cfif>
+
+<cfparam name="form.username"  default="">
+<cfparam name="form.password1" default="">
+<cfparam name="form.password2" default="">
+<cfparam name="form.submit"    default="">
+
+<cfset formErrors = []>
+
+<cfif len(form.submit)>
+
+    <cfif len(trim(form.username)) LT 2>
+        <cfset arrayAppend(formErrors, "Username must be at least 2 characters.")>
+    </cfif>
+    <cfif len(form.password1) LT 8>
+        <cfset arrayAppend(formErrors, "Password must be at least 8 characters.")>
+    </cfif>
+    <cfif form.password1 NEQ form.password2>
+        <cfset arrayAppend(formErrors, "Passwords do not match.")>
+    </cfif>
+
+    <cfif NOT arrayLen(formErrors)>
+        <cfquery datasource="#application.dsn#">
+            INSERT INTO login (name, password, access_level, active)
+            VALUES (
+                <cfqueryparam value="#trim(form.username)#"    cfsqltype="cf_sql_varchar" maxlength="64">,
+                <cfqueryparam value="#generateHash(form.password1)#" cfsqltype="cf_sql_varchar" maxlength="255">,
+                10000,
+                1
+            )
+        </cfquery>
+        <cflocation url="/admin/" addtoken="no">
+    </cfif>
+
+</cfif>
+
+<cfparam name="attributes.pageTitle" default="First-time setup">
+<cfinclude template="/includes/header_public.cfm">
+
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card shadow-sm">
+            <div class="card-header fw-semibold">Create first admin user</div>
+            <div class="card-body">
+
+                <p class="text-muted small mb-3">
+                    This page is only available before any admin user exists.
+                    It will redirect away permanently once setup is complete.
+                </p>
+
+                <cfif arrayLen(formErrors)>
+                    <div class="alert alert-danger py-2">
+                        <ul class="mb-0 small">
+                            <cfloop array="#formErrors#" item="e">
+                                <li><cfoutput>#encodeForHTML(e)#</cfoutput></li>
+                            </cfloop>
+                        </ul>
+                    </div>
+                </cfif>
+
+                <form method="post" action="/initialize.cfm" novalidate>
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input  type="text"
+                                class="form-control"
+                                id="username"
+                                name="username"
+                                value="<cfoutput>#encodeForHTML(form.username)#</cfoutput>"
+                                autocomplete="username"
+                                autofocus>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password1" class="form-label">
+                            Password
+                            <span class="text-muted fw-normal">(min 8 characters)</span>
+                        </label>
+                        <input  type="password"
+                                class="form-control"
+                                id="password1"
+                                name="password1"
+                                autocomplete="new-password">
+                    </div>
+                    <div class="mb-4">
+                        <label for="password2" class="form-label">Confirm password</label>
+                        <input  type="password"
+                                class="form-control"
+                                id="password2"
+                                name="password2"
+                                autocomplete="new-password">
+                    </div>
+                    <button type="submit" name="submit" value="1" class="btn btn-primary w-100">
+                        Create admin user
+                    </button>
+                </form>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<cfinclude template="/includes/footer_public.cfm">

@@ -82,7 +82,7 @@
                 <label class="form-label small mb-1">Action</label>
                 <select class="form-select form-select-sm" name="action">
                     <option value="">All actions</option>
-                    <cfloop list="ADD,EDIT,DELETE,LOCK,UNLOCK,DELIST,LOGIN,LOGOUT" index="a">
+                    <cfloop list="ADD,EDIT,DELETE,LOCK,UNLOCK,DELIST,ACTIVATE,DEACTIVATE,LOGIN,LOGOUT" index="a">
                         <option value="<cfoutput>#a#</cfoutput>" <cfif url.action EQ a>selected</cfif>>
                             <cfoutput>#a#</cfoutput>
                         </option>
@@ -129,7 +129,9 @@
                         <cfswitch expression="#action#">
                             <cfcase value="ADD">     <span class="badge bg-success">#action#</span></cfcase>
                             <cfcase value="DELETE">  <span class="badge bg-danger">#action#</span></cfcase>
-                            <cfcase value="DELIST">  <span class="badge bg-warning text-dark">#action#</span></cfcase>
+                            <cfcase value="DELIST">     <span class="badge bg-warning text-dark">#action#</span></cfcase>
+                                    <cfcase value="DEACTIVATE"><span class="badge bg-secondary">#action#</span></cfcase>
+                                    <cfcase value="ACTIVATE">  <span class="badge bg-success">#action#</span></cfcase>
                             <cfcase value="LOCK">    <span class="badge bg-danger">#action#</span></cfcase>
                             <cfcase value="UNLOCK">  <span class="badge bg-success">#action#</span></cfcase>
                             <cfcase value="EDIT">    <span class="badge bg-secondary">#action#</span></cfcase>

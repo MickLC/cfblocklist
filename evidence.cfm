@@ -15,7 +15,7 @@
 
 <!--- Fetch entry --->
 <cfquery datasource="#application.dsn#" name="entry">
-    SELECT  id, entry_type, address, cidr, locked, added_date
+    SELECT  id, entry_type, address, cidr, locked, active, added_date
     FROM    ip
     WHERE   id = <cfqueryparam value="#val(url.id)#" cfsqltype="cf_sql_integer">
     LIMIT 1
@@ -23,6 +23,11 @@
 
 <cfif entry.recordCount EQ 0>
     <cflocation url="/" addtoken="no">
+</cfif>
+
+<!--- Inactive entries are not publicly listed — redirect to not-found --->
+<cfif NOT entry.active>
+    <cflocation url="/?delisted=1&q=#encodeForURL(entry.address)#" addtoken="no">
 </cfif>
 
 <!--- Fetch all evidence records for this entry --->

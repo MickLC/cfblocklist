@@ -1,7 +1,6 @@
 <!---
-    admin/entries.cfm  —  Paginated entry list with search, filter, lock/unlock, delete
+    admin/entries.cfm  —  Paginated entry list with search, filter, lock/unlock, activate/deactivate, delete
 --->
-<cfinclude template="/config/pepper.cfm">
 <cfinclude template="/config/settings.cfm">
 <cfinclude template="/includes/functions.cfm">
 <cfset requireLogin()>
@@ -10,15 +9,15 @@
 <cfparam name="url.q"       default="">
 <cfparam name="url.type"    default="">
 <cfparam name="url.locked"  default="">
+<cfparam name="url.active"  default="">
 <cfparam name="url.page"    default="1">
 <cfparam name="url.action"  default="">
 <cfparam name="url.id"      default="0">
 
-<!--- ── Inline actions (lock/unlock/delete via GET+id) ──────────────────── --->
+<!--- ── Inline actions ──────────────────────────────────────────────────── --->
 <cfif len(url.action) AND isNumeric(url.id) AND val(url.id) GT 0>
     <cfset actionId = val(url.id)>
 
-    <!--- Fetch entry for audit --->
     <cfquery datasource="#application.dsn#" name="actionEntry">
         SELECT id, entry_type, address, cidr FROM ip
         WHERE id = <cfqueryparam value="#actionId#" cfsqltype="cf_sql_integer">
@@ -35,21 +34,44 @@
         <cfswitch expression="#url.action#">
             <cfcase value="lock">
                 <cfquery datasource="#application.dsn#">
-                    UPDATE ip SET locked = 1, modified_by = <cfqueryparam value="#session.adminId#" cfsqltype="cf_sql_integer">,
-                    modified_date = NOW()
+                    UPDATE ip SET locked = 1,
+                        modified_by = <cfqueryparam value="#session.adminId#" cfsqltype="cf_sql_integer">,
+                        modified_date = NOW()
                     WHERE id = <cfqueryparam value="#actionId#" cfsqltype="cf_sql_integer">
                 </cfquery>
                 <cfset writeAuditLog(action="LOCK", target=aDisplay, entryType=actionEntry.entry_type)>
             </cfcase>
             <cfcase value="unlock">
                 <cfquery datasource="#application.dsn#">
-                    UPDATE ip SET locked = 0, modified_by = <cfqueryparam value="#session.adminId#" cfsqltype="cf_sql_integer">,
-                    modified_date = NOW()
+                    UPDATE ip SET locked = 0,
+                        modified_by = <cfqueryparam value="#session.adminId#" cfsqltype="cf_sql_integer">,
+                        modified_date = NOW()
                     WHERE id = <cfqueryparam value="#actionId#" cfsqltype="cf_sql_integer">
                 </cfquery>
                 <cfset writeAuditLog(action="UNLOCK", target=aDisplay, entryType=actionEntry.entry_type)>
             </cfcase>
+            <cfcase value="deactivate">
+                <cfquery datasource="#application.dsn#">
+                    UPDATE ip SET active = 0,
+                        modified_by = <cfqueryparam value="#session.adminId#" cfsqltype="cf_sql_integer">,
+                        modified_date = NOW()
+                    WHERE id = <cfqueryparam value="#actionId#" cfsqltype="cf_sql_integer">
+                </cfquery>
+                <cfset writeAuditLog(action="DEACTIVATE", target=aDisplay, entryType=actionEntry.entry_type)>
+                <cfset reloadRbldnsd()>
+            </cfcase>
+            <cfcase value="activate">
+                <cfquery datasource="#application.dsn#">
+                    UPDATE ip SET active = 1,
+                        modified_by = <cfqueryparam value="#session.adminId#" cfsqltype="cf_sql_integer">,
+                        modified_date = NOW()
+                    WHERE id = <cfqueryparam value="#actionId#" cfsqltype="cf_sql_integer">
+                </cfquery>
+                <cfset writeAuditLog(action="ACTIVATE", target=aDisplay, entryType=actionEntry.entry_type)>
+                <cfset reloadRbldnsd()>
+            </cfcase>
             <cfcase value="delete">
+                <!--- Hard delete — admin only, removes record and all evidence --->
                 <cfquery datasource="#application.dsn#">
                     DELETE FROM ip WHERE id = <cfqueryparam value="#actionId#" cfsqltype="cf_sql_integer">
                 </cfquery>
@@ -58,8 +80,7 @@
             </cfcase>
         </cfswitch>
 
-        <!--- Redirect to clear the action params --->
-        <cflocation url="/admin/entries.cfm?q=#encodeForURL(url.q)#&type=#encodeForURL(url.type)#&locked=#encodeForURL(url.locked)#&page=#encodeForURL(url.page)#" addtoken="no">
+        <cflocation url="/admin/entries.cfm?q=#encodeForURL(url.q)#&type=#encodeForURL(url.type)#&locked=#encodeForURL(url.locked)#&active=#encodeForURL(url.active)#&page=#encodeForURL(url.page)#" addtoken="no">
     </cfif>
 </cfif>
 
@@ -79,13 +100,18 @@
     <cfelseif url.locked EQ "0">
         AND locked = 0
     </cfif>
+    <cfif url.active EQ "1">
+        AND active = 1
+    <cfelseif url.active EQ "0">
+        AND active = 0
+    </cfif>
 </cfquery>
 
 <cfset pg = getPaginationVars(countRows.total, val(url.page))>
 
 <!--- ── Fetch page of entries ───────────────────────────────────────────── --->
 <cfquery datasource="#application.dsn#" name="entries">
-    SELECT  i.id, i.entry_type, i.address, i.cidr, i.locked,
+    SELECT  i.id, i.entry_type, i.address, i.cidr, i.locked, i.active,
             i.added_date, i.modified_date,
             l.name AS added_by_name,
             (SELECT COUNT(*) FROM evidence e WHERE e.ip_id = i.id) AS evidence_count
@@ -103,13 +129,17 @@
     <cfelseif url.locked EQ "0">
         AND i.locked = 0
     </cfif>
+    <cfif url.active EQ "1">
+        AND i.active = 1
+    <cfelseif url.active EQ "0">
+        AND i.active = 0
+    </cfif>
     ORDER BY i.added_date DESC
     LIMIT  <cfqueryparam value="#pg.pageSize#" cfsqltype="cf_sql_integer">
     OFFSET <cfqueryparam value="#pg.offset#"   cfsqltype="cf_sql_integer">
 </cfquery>
 
-<!--- Build filter query string for pagination links --->
-<cfset filterQS = "q=#encodeForURL(url.q)#&type=#encodeForURL(url.type)#&locked=#encodeForURL(url.locked)#">
+<cfset filterQS = "q=#encodeForURL(url.q)#&type=#encodeForURL(url.type)#&locked=#encodeForURL(url.locked)#&active=#encodeForURL(url.active)#">
 
 <cfparam name="attributes.pageTitle" default="Entries">
 <cfinclude template="/includes/header_admin.cfm">
@@ -126,7 +156,7 @@
 <form method="get" action="/admin/entries.cfm" class="card shadow-sm mb-4">
     <div class="card-body py-2">
         <div class="row g-2 align-items-end">
-            <div class="col-md-5">
+            <div class="col-md-4">
                 <label class="form-label small mb-1">Search address</label>
                 <input  type="text"
                         class="form-control form-control-sm"
@@ -151,7 +181,15 @@
                     <option value="0" <cfif url.locked EQ "0">selected</cfif>>Unlocked</option>
                 </select>
             </div>
-            <div class="col-md-3 d-flex gap-2">
+            <div class="col-md-2">
+                <label class="form-label small mb-1">Active status</label>
+                <select class="form-select form-select-sm" name="active">
+                    <option value="">All</option>
+                    <option value="1" <cfif url.active EQ "1">selected</cfif>>Active</option>
+                    <option value="0" <cfif url.active EQ "0">selected</cfif>>Inactive</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-2">
                 <button type="submit" class="btn btn-sm btn-primary flex-fill">Filter</button>
                 <a href="/admin/entries.cfm" class="btn btn-sm btn-outline-secondary">Clear</a>
             </div>
@@ -167,7 +205,8 @@
                 <tr>
                     <th>Entry</th>
                     <th>Type</th>
-                    <th>Status</th>
+                    <th>Lock</th>
+                    <th>Active</th>
                     <th>Evidence</th>
                     <th>Added</th>
                     <th>By</th>
@@ -176,13 +215,13 @@
             </thead>
             <tbody>
                 <cfoutput query="entries">
-                <tr>
-                    <td class="font-monospace small fw-semibold">
+                <tr class="<cfif NOT active>table-secondary</cfif>">
+                    <td class="font-monospace small fw-semibold <cfif NOT active>text-muted</cfif>">
                         #encodeForHTML(address)#<cfif entry_type EQ "cidr">/#encodeForHTML(cidr)#</cfif>
                     </td>
                     <td>
                         <span class="badge
-                            <cfif entry_type EQ 'hostname'>text-white" style="background:#6f42c1
+                            <cfif entry_type EQ 'hostname'>text-white" style="background:##6f42c1
                             <cfelseif entry_type EQ 'cidr'>bg-primary
                             <cfelse>bg-info text-dark</cfif>">
                             #uCase(entry_type)#
@@ -193,6 +232,13 @@
                             <span class="badge bg-danger">Locked</span>
                         <cfelse>
                             <span class="badge bg-success">Open</span>
+                        </cfif>
+                    </td>
+                    <td>
+                        <cfif active>
+                            <span class="badge bg-success">Active</span>
+                        <cfelse>
+                            <span class="badge bg-secondary">Inactive</span>
                         </cfif>
                     </td>
                     <td class="text-center">
@@ -222,9 +268,22 @@
                             </a>
                         </cfif>
 
+                        <cfif active>
+                            <a href="/admin/entries.cfm?action=deactivate&id=#encodeForURL(id)#&#filterQS#&page=#encodeForURL(pg.currentPage)#"
+                               class="btn btn-sm btn-outline-secondary"
+                               onclick="return confirm('Deactivate #encodeForHTML(address)#? It will be removed from the live blocklist but kept in the database.')">
+                                Deactivate
+                            </a>
+                        <cfelse>
+                            <a href="/admin/entries.cfm?action=activate&id=#encodeForURL(id)#&#filterQS#&page=#encodeForURL(pg.currentPage)#"
+                               class="btn btn-sm btn-outline-success">
+                                Reactivate
+                            </a>
+                        </cfif>
+
                         <a href="/admin/entries.cfm?action=delete&id=#encodeForURL(id)#&#filterQS#&page=#encodeForURL(pg.currentPage)#"
                            class="btn btn-sm btn-outline-danger"
-                           onclick="return confirm('Permanently delete #encodeForHTML(address)#? This cannot be undone.')">
+                           onclick="return confirm('Permanently DELETE #encodeForHTML(address)# and all its evidence? This cannot be undone.')">
                             Delete
                         </a>
                     </td>
@@ -233,7 +292,7 @@
 
                 <cfif entries.recordCount EQ 0>
                     <tr>
-                        <td colspan="7" class="text-center text-muted py-4">
+                        <td colspan="8" class="text-center text-muted py-4">
                             No entries match your filter.
                         </td>
                     </tr>
@@ -242,7 +301,6 @@
         </table>
     </div>
 
-    <!--- Pagination --->
     <cfif pg.totalPages GT 1>
         <div class="card-footer d-flex justify-content-between align-items-center">
             <small class="text-muted">

@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS ip (
     address     VARCHAR(253) NOT NULL,          -- IP, CIDR base, or hostname/domain
     cidr        TINYINT UNSIGNED NULL,           -- NULL for hostnames
     locked      TINYINT(1) NOT NULL DEFAULT 0,  -- 1 = admin-locked, no self-delist
+    active      TINYINT(1) NOT NULL DEFAULT 1,  -- 0 = delisted/inactive, still in DB
     added_date  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     added_by    INT UNSIGNED NULL,               -- FK to login.id
     modified_date DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
@@ -21,7 +22,8 @@ CREATE TABLE IF NOT EXISTS ip (
     PRIMARY KEY (id),
     UNIQUE KEY uq_address_cidr (address, cidr),
     KEY idx_entry_type (entry_type),
-    KEY idx_locked (locked)
+    KEY idx_locked (locked),
+    KEY idx_active (active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
@@ -89,6 +91,15 @@ SET @exist = (SELECT COUNT(*) FROM information_schema.COLUMNS
 SET @sql = IF(@exist=0,
     'ALTER TABLE ip ADD COLUMN locked TINYINT(1) NOT NULL DEFAULT 0 AFTER cidr',
     'SELECT ''locked already exists''');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+
+-- ip.active
+SET @exist = (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA=@dbname AND TABLE_NAME='ip' AND COLUMN_NAME='active');
+SET @sql = IF(@exist=0,
+    'ALTER TABLE ip ADD COLUMN active TINYINT(1) NOT NULL DEFAULT 1 AFTER locked',
+    'SELECT ''active already exists''');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ip.added_date
