@@ -92,6 +92,8 @@ function detectEntryType(required string addr) {
 //        Envelope-To, X-Envelope-To, X-RCPT-To, X-Spam-Rcpt
 //        X-Forwarded-Encrypted, X-BeenThere, X-Spam-Checked-In-Group
 //        List-Subscribe, List-Unsubscribe
+//        To: — both the quoted display name and <address> are the trap;
+//              the entire value is redacted
 //
 //   3. Return-Path: — redact only the <address> inside angle brackets.
 //
@@ -101,12 +103,13 @@ function detectEntryType(required string addr) {
 //
 //   6. darn= tag — leaks recipient domain; redact the value.
 //
-//   7. From: and To: — redact local part of email addresses only,
-//      keeping @domain visible as evidence.
+//   7. From: — redact only the local part (before @), keeping @domain
+//      visible as evidence of the sending infrastructure. The local part
+//      can encode the trap address via tagged/subaddressed delivery.
 //
 //   8. Message-ID: — redact local part inside <localpart@domain>,
-//      keeping @domain. The local part can encode the trap address
-//      when the MTA generates message IDs from the envelope recipient.
+//      keeping @domain. Some MTAs embed the envelope recipient in the
+//      message ID local part.
 //
 function redactEvidence(required string text) {
     var s = arguments.text;
@@ -119,6 +122,8 @@ function redactEvidence(required string text) {
     s = reReplaceNoCase(s, '\[REDACT\].*?\[/REDACT\]', '[redacted]', 'ALL');
 
     // 2. Recipient-revealing headers — entire value + folded continuations.
+    //    To: is included because both the display name (which often repeats
+    //    the trap address verbatim) and the <address> are the trap recipient.
     //    Anchored to column 0; uses Java Pattern for reliable multiline handling.
     var recipientHeaders =
         'Delivered-To' &
@@ -132,7 +137,8 @@ function redactEvidence(required string text) {
         '|X-BeenThere' &
         '|X-Spam-Checked-In-Group' &
         '|List-Subscribe' &
-        '|List-Unsubscribe';
+        '|List-Unsubscribe' &
+        '|To';
 
     var jPattern = createObject('java', 'java.util.regex.Pattern');
     var jMatcher = jPattern.compile(
@@ -175,23 +181,24 @@ function redactEvidence(required string text) {
     // 6. darn= tag — recipient domain.
     s = reReplaceNoCase(s, '(\bdarn=)[a-zA-Z0-9.\-]+', '\1[redacted]', 'ALL');
 
-    // 7. From: and To: — redact only the local part of email addresses.
+    // 7. From: — redact only the local part of email addresses.
     //    The @domain is kept as it identifies the sending infrastructure.
-    var fromToPattern = jPattern.compile(
-        '(?im)^((?:From|To):.*?)[a-zA-Z0-9._%+\-]+(@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})'
+    //    The local part can encode the trap via tagged/subaddressed delivery.
+    var fromPattern = jPattern.compile(
+        '(?im)^(From:.*?)[a-zA-Z0-9._%+\-]+(@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})'
     );
-    var fromToMatcher = fromToPattern.matcher(s);
+    var fromMatcher = fromPattern.matcher(s);
     var sb2 = createObject('java', 'java.lang.StringBuffer').init();
-    while (fromToMatcher.find()) {
-        fromToMatcher.appendReplacement(sb2,
+    while (fromMatcher.find()) {
+        fromMatcher.appendReplacement(sb2,
             javaCast('string',
-                fromToMatcher.group(1).replaceAll('\\$', '\\\$') &
+                fromMatcher.group(1).replaceAll('\\$', '\\\$') &
                 '[redacted]' &
-                fromToMatcher.group(2).replaceAll('\\$', '\\\$')
+                fromMatcher.group(2).replaceAll('\\$', '\\\$')
             )
         );
     }
-    fromToMatcher.appendTail(sb2);
+    fromMatcher.appendTail(sb2);
     s = sb2.toString();
 
     // 8. Message-ID: — redact local part inside <localpart@domain>.
