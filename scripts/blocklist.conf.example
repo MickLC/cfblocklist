@@ -20,7 +20,7 @@ DB_PASS="your-password"
 # ── DNSBL zone and return value ────────────────────────────────────────────
 # Zone must match pipe-regex in pdns-pipe.conf AND the zone configured
 # in PowerDNS (gmysql or bind backend zone record).
-DNSBL_ZONE="dnsbl.whizardries.com"
+DNSBL_ZONE="dnsbl.example.com"
 DNSBL_RETURN="127.0.0.2"
 DNSBL_TTL="300"
 
@@ -40,18 +40,18 @@ DNSBL_MESSAGE="Listed on {zone}"
 # ── Zone SOA/NS ────────────────────────────────────────────────────────────
 # These are used by the pipe backend to answer SOA and NS queries.
 # Must match what your authoritative zone record says.
-SOA_ORIGIN="ns1.whizardries.com."
-SOA_HOSTMASTER="hostmaster.whizardries.com."
+SOA_ORIGIN="ns1.example.com."
+SOA_HOSTMASTER="hostmaster.example.com."
 SOA_TTL="3600"
 SOA_REFRESH="3600"
 SOA_RETRY="600"
 SOA_EXPIRE="86400"
 SOA_MINTTL="300"
 
-NS_HOST="ns1.whizardries.com."
+NS_HOST="ns1.example.com."
 NS_TTL="3600"
 # Optional second nameserver:
-# NS2_HOST="ns2.whizardries.com."
+# NS2_HOST="ns2.example.com."
 
 # ── Logging ────────────────────────────────────────────────────────────────
 # Log file must be writable by the pdns user.

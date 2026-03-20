@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""PowerDNS pipe backend for dnsbl.whizardries.com.
+"""PowerDNS pipe backend for a DNSBL zone.
 
-Handles DNSBL lookups against the blocklist MariaDB database,
-replacing rbldnsd. PowerDNS owns port 53; this script is a
-long-lived child process that PowerDNS forks and communicates
-with via stdin/stdout using the pipe backend ABI (version 1).
+Handles DNSBL lookups against the blocklist MariaDB database.
+PowerDNS owns port 53; this script is a long-lived child process
+that PowerDNS forks and communicates with via stdin/stdout using
+the pipe backend ABI (version 1).
 
 Protocol reference:
   https://doc.powerdns.com/authoritative/backends/pipe.html
@@ -47,14 +47,14 @@ Lookup logic
   Strip the zone suffix to get the subject.
 
   Subject looks like a reversed-octet IP  →  IP / CIDR lookup
-    e.g. 4.3.2.1.dnsbl.whizardries.com  →  subject = 4.3.2.1
+    e.g. 4.3.2.1.dnsbl.example.com  →  subject = 4.3.2.1
     Un-reverse it: 1.2.3.4
     1. Exact match on ip.address = '1.2.3.4' AND entry_type = 'ip'
     2. CIDR containment: iterate active CIDR entries, test with ipaddress module
        Works for any prefix length — /8 through /32.
 
   Subject looks like a hostname            →  hostname lookup
-    e.g. mail.example.com.dnsbl.whizardries.com  →  subject = mail.example.com
+    e.g. mail.example.com.dnsbl.example.com  →  subject = mail.example.com
     1. Exact match on ip.address = 'mail.example.com' AND entry_type = 'hostname'
     2. Wildcard walk-up: .mail.example.com, .example.com, .com
        (leading-dot entries in the ip table act as wildcards)
@@ -74,7 +74,7 @@ Configuration
               omitted for exact-IP and hostname matches)
 
   Example messages:
-    DNSBL_MESSAGE="Listed on {zone}. See https://bl.example.com/?ip={zone}"
+    DNSBL_MESSAGE="Listed on {zone}. See https://bl.example.com"
     DNSBL_MESSAGE="Blocked: {zone} policy violation"
 
 Installation
@@ -145,15 +145,15 @@ log = logging.getLogger("dnsbl-pipe")
 # ---------------------------------------------------------------------------
 # Zone / return-value config
 # ---------------------------------------------------------------------------
-DNSBL_ZONE    = conf.get("DNSBL_ZONE",    "dnsbl.whizardries.com").rstrip(".")
+DNSBL_ZONE    = conf.get("DNSBL_ZONE",    "dnsbl.example.com").rstrip(".")
 DNSBL_RETURN  = conf.get("DNSBL_RETURN",  "127.0.0.2")
 DNSBL_TTL     = int(conf.get("DNSBL_TTL", "300"))
 # TXT record message. Supports {zone} and {cidr} placeholders.
 DNSBL_MESSAGE = conf.get("DNSBL_MESSAGE", "Listed on {zone}")
 
 # SOA values
-SOA_ORIGIN     = conf.get("SOA_ORIGIN",     f"ns1.{DNSBL_ZONE}.")
-SOA_HOSTMASTER = conf.get("SOA_HOSTMASTER", f"hostmaster.{DNSBL_ZONE.split('.', 1)[-1] if '.' in DNSBL_ZONE else DNSBL_ZONE}.")
+SOA_ORIGIN     = conf.get("SOA_ORIGIN",     f"ns1.example.com.")
+SOA_HOSTMASTER = conf.get("SOA_HOSTMASTER", f"hostmaster.example.com.")
 SOA_TTL        = int(conf.get("SOA_TTL",    "3600"))
 SOA_REFRESH    = int(conf.get("SOA_REFRESH", "3600"))
 SOA_RETRY      = int(conf.get("SOA_RETRY",   "600"))
@@ -161,7 +161,7 @@ SOA_EXPIRE     = int(conf.get("SOA_EXPIRE",  "86400"))
 SOA_MINTTL     = int(conf.get("SOA_MINTTL",  "300"))
 SOA_SERIAL     = 1  # static; pipe backend doesn't need incrementing serials
 
-NS_HOST  = conf.get("NS_HOST",  f"ns1.{DNSBL_ZONE}.")
+NS_HOST  = conf.get("NS_HOST",  "ns1.example.com.")
 NS2_HOST = conf.get("NS2_HOST", "")
 NS_TTL   = int(conf.get("NS_TTL", "3600"))
 
