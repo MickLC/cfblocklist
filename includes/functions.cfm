@@ -93,6 +93,7 @@ function detectEntryType(required string addr) {
 //        Delivered-To, X-Original-To, X-Forwarded-To
 //        Envelope-To, X-Envelope-To, X-RCPT-To, X-Spam-Rcpt
 //        X-Forwarded-Encrypted, X-BeenThere, X-Spam-Checked-In-Group
+//        List-Subscribe, List-Unsubscribe
 //
 //   3. Return-Path: — redact only the <address> inside angle brackets.
 //
@@ -127,7 +128,9 @@ function redactEvidence(required string text) {
         '|X-Spam-Rcpt' &
         '|X-Forwarded-Encrypted' &
         '|X-BeenThere' &
-        '|X-Spam-Checked-In-Group';
+        '|X-Spam-Checked-In-Group' &
+        '|List-Subscribe' &
+        '|List-Unsubscribe';
 
     // Build pattern: ^(HeaderName):[ \t]*[^\n]*(\n[ \t]+[^\n]*)*
     // This matches the header line and any folded continuation lines.
@@ -136,12 +139,8 @@ function redactEvidence(required string text) {
         '(?im)^(' & recipientHeaders & '):[ \t]*[^\n]*(\n[ \t]+[^\n]*)*'
     );
     var matcher = jMatcher.matcher(s);
-    // Replace each match with "HeaderName: [redacted]"
     var sb = createObject('java', 'java.lang.StringBuffer').init();
     while (matcher.find()) {
-        // group(1) is the header name captured by the first () in the alternation —
-        // but with alternation the group number is 1 for the whole match prefix.
-        // Use replaceAll-style: replace entire match with name + redacted.
         var matchedName = listFirst(matcher.group(0), ':');
         matcher.appendReplacement(sb, javaCast('string', matchedName & ': [redacted]'));
     }
