@@ -35,8 +35,8 @@ Zone cache fill (ABI 1)
 
 Query types answered
 --------------------
-  A       → 127.0.0.2 if listed, else NXDOMAIN (return END with no DATA)
-  TXT     → listing reason text if listed, else NXDOMAIN
+  A       → DNSBL_RETURN (default 127.0.0.2) if listed, else NXDOMAIN
+  TXT     → DNSBL_MESSAGE text if listed, else NXDOMAIN
   ANY     → both A and TXT records if listed
   SOA     → SOA for the zone apex
   NS      → NS records for the zone apex
@@ -51,26 +51,38 @@ Lookup logic
     Un-reverse it: 1.2.3.4
     1. Exact match on ip.address = '1.2.3.4' AND entry_type = 'ip'
     2. CIDR containment: iterate active CIDR entries, test with ipaddress module
+       Works for any prefix length — /8 through /32.
 
   Subject looks like a hostname            →  hostname lookup
     e.g. mail.example.com.dnsbl.whizardries.com  →  subject = mail.example.com
     1. Exact match on ip.address = 'mail.example.com' AND entry_type = 'hostname'
     2. Wildcard walk-up: .mail.example.com, .example.com, .com
+       (leading-dot entries in the ip table act as wildcards)
 
 Configuration
 -------------
   Read from /opt/blocklist/blocklist.conf (shell-style key=value).
   Required keys: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS
-  Optional keys: DNSBL_ZONE, DNSBL_RETURN, DNSBL_TTL,
+  Optional keys: DNSBL_ZONE, DNSBL_RETURN, DNSBL_TTL, DNSBL_MESSAGE,
                  SOA_ORIGIN, SOA_HOSTMASTER, SOA_TTL, SOA_REFRESH,
                  SOA_RETRY, SOA_EXPIRE, SOA_MINTTL,
                  NS_HOST, NS2_HOST, NS_TTL, PIPE_LOG
+
+  DNSBL_MESSAGE supports two optional placeholders:
+    {zone}  — replaced with DNSBL_ZONE
+    {cidr}  — replaced with the matching CIDR range (IP/CIDR lookups only;
+              omitted for exact-IP and hostname matches)
+
+  Example messages:
+    DNSBL_MESSAGE="Listed on {zone}. See https://bl.example.com/?ip={zone}"
+    DNSBL_MESSAGE="Blocked: {zone} policy violation"
 
 Installation
 ------------
   cp scripts/dnsbl-pipe.py /opt/blocklist/dnsbl-pipe.py
   chmod 755 /opt/blocklist/dnsbl-pipe.py
   chown root:pdns /opt/blocklist/dnsbl-pipe.py
+  touch /var/log/dnsbl-pipe.log && chown pdns:pdns /var/log/dnsbl-pipe.log
   pip3 install PyMySQL   # or: apt install python3-pymysql
 """
 
@@ -133,9 +145,11 @@ log = logging.getLogger("dnsbl-pipe")
 # ---------------------------------------------------------------------------
 # Zone / return-value config
 # ---------------------------------------------------------------------------
-DNSBL_ZONE   = conf.get("DNSBL_ZONE",   "dnsbl.whizardries.com").rstrip(".")
-DNSBL_RETURN = conf.get("DNSBL_RETURN", "127.0.0.2")
-DNSBL_TTL    = int(conf.get("DNSBL_TTL", "300"))
+DNSBL_ZONE    = conf.get("DNSBL_ZONE",    "dnsbl.whizardries.com").rstrip(".")
+DNSBL_RETURN  = conf.get("DNSBL_RETURN",  "127.0.0.2")
+DNSBL_TTL     = int(conf.get("DNSBL_TTL", "300"))
+# TXT record message. Supports {zone} and {cidr} placeholders.
+DNSBL_MESSAGE = conf.get("DNSBL_MESSAGE", "Listed on {zone}")
 
 # SOA values
 SOA_ORIGIN     = conf.get("SOA_ORIGIN",     f"ns1.{DNSBL_ZONE}.")
@@ -183,6 +197,14 @@ def get_conn():
     return _conn
 
 # ---------------------------------------------------------------------------
+# Message builder
+# ---------------------------------------------------------------------------
+
+def build_message(cidr: str = "") -> str:
+    """Expand DNSBL_MESSAGE placeholders."""
+    return DNSBL_MESSAGE.replace("{zone}", DNSBL_ZONE).replace("{cidr}", cidr)
+
+# ---------------------------------------------------------------------------
 # Lookup helpers
 # ---------------------------------------------------------------------------
 
@@ -201,6 +223,7 @@ def lookup_ip(ip_str: str):
     """
     Look up an IPv4 address against the blocklist.
     Returns (True, reason_text) if listed, (False, None) if not.
+    Handles exact IPs and CIDR ranges of any prefix length.
     """
     try:
         ip_obj = ipaddress.IPv4Address(ip_str)
@@ -224,9 +247,9 @@ def lookup_ip(ip_str: str):
         row = cur.fetchone()
         if row:
             _touch_last_hit(cur, row["id"])
-            return True, f"Listed in {DNSBL_ZONE}"
+            return True, build_message()
 
-        # 2. CIDR containment
+        # 2. CIDR containment — works for any prefix length (/8 through /32)
         cur.execute(
             """
             SELECT id, address, cidr FROM ip
@@ -240,7 +263,8 @@ def lookup_ip(ip_str: str):
                 net = ipaddress.IPv4Network(f"{row['address']}/{row['cidr']}", strict=False)
                 if ip_obj in net:
                     _touch_last_hit(cur, row["id"])
-                    return True, f"Listed in {DNSBL_ZONE} (CIDR {row['address']}/{row['cidr']})"
+                    cidr_str = f"{row['address']}/{row['cidr']}"
+                    return True, build_message(cidr=cidr_str)
             except ValueError:
                 continue
 
@@ -272,7 +296,7 @@ def lookup_hostname(subject: str):
         row = cur.fetchone()
         if row:
             _touch_last_hit(cur, row["id"])
-            return True, f"Listed in {DNSBL_ZONE}"
+            return True, build_message()
 
         # 2. Wildcard walk-up
         labels = subject.split(".")
@@ -292,7 +316,7 @@ def lookup_hostname(subject: str):
             row = cur.fetchone()
             if row:
                 _touch_last_hit(cur, row["id"])
-                return True, f"Listed in {DNSBL_ZONE} (wildcard {wildcard})"
+                return True, build_message()
 
     return False, None
 
@@ -420,12 +444,10 @@ def handle_list(zone: str) -> list:
     try:
         if zone_lower == ZONE_APEX:
             lines.extend(zone_apex_records(DNSBL_ZONE))
-        # For any other zone, return empty (END only) — pipe-regex
-        # should prevent pdns from sending us out-of-zone LISTs anyway.
         lines.append("END")
     except Exception as e:
         log.error("Error handling LIST for %s: %s", zone, e)
-        lines = ["END"]  # don't FAIL on LIST — just return empty
+        lines = ["END"]
     return lines
 
 # ---------------------------------------------------------------------------
@@ -476,7 +498,6 @@ def main():
                 sys.stdout.write(ans + "\n")
 
         elif cmd == "LIST":
-            # LIST\t<domain-id>\t<zone-name>  (ABI 1 zone cache fill)
             zone = parts[2] if len(parts) >= 3 else DNSBL_ZONE
             log.info("LIST request for zone: %s", zone)
             for ans in handle_list(zone):

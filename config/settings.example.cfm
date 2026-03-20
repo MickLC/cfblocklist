@@ -13,8 +13,8 @@ application.adminEmail  = "admin@example.com";
 application.contactText = "If you believe your listing is in error, use the lookup below.";
 
 // ── DNS zone ────────────────────────────────────────────────────────────────
-// The zone name rbldnsd answers for. Shown in the public About page
-// in dig / Postfix configuration examples.
+// The DNSBL zone name. Shown in the public About page in dig / Postfix
+// configuration examples.
 application.dnsZone = "bl.example.com";
 
 // ── Pepper flat-file path ───────────────────────────────────────────────────
@@ -27,19 +27,10 @@ application.dnsZone = "bl.example.com";
 application.pepperFile = "";
 // Example: application.pepperFile = "/var/www/cfblocklist/private/pepper.txt";
 
-// ── rbldnsd reload ─────────────────────────────────────────────────────────
-// Full path to the shell script that signals rbldnsd to reload.
-// The script sends SIGHUP to the rbldnsd process.
-// No sudo needed if the Lucee service user owns the rbldnsd process,
-// or if a sudo rule is in place for this specific script.
-// Set to "" to disable automatic reload (reload manually instead).
-application.rbldnsdReloadScript = "/opt/blocklist/scripts/reload-rbldnsd.sh";
-
 // ── Self-delist settings ────────────────────────────────────────────────────
 // One-click delist for unlocked entries — immediate, no email confirmation.
 // Set to true to receive an admin notification email on every self-delist.
 application.delistNotifyAdmin = true;
-
 
 // ── Entry expiry ────────────────────────────────────────────────────────────
 // Default number of days before an unlocked, active entry is automatically
@@ -47,6 +38,7 @@ application.delistNotifyAdmin = true;
 // Set to 0 to default new entries to never-expire (can still be set per entry).
 // Locked entries are always exempt from auto-expiry regardless of this setting.
 application.defaultExpiryDays = 90;
+
 // ── Pagination ──────────────────────────────────────────────────────────────
 application.pageSize = 25;
 

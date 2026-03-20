@@ -80,26 +80,6 @@ function detectEntryType(required string addr) {
     return 'unknown';
 }
 
-// ── rbldnsd reload ────────────────────────────────────────────────────────
-function reloadRbldnsd() {
-    if (len(trim(application.rbldnsdReloadScript)) == 0) return;
-    try {
-        cfexecute(
-            name      = application.rbldnsdReloadScript,
-            timeout   = 10,
-            variable  = "local.execOut",
-            errorVariable = "local.execErr"
-        );
-    } catch(any e) {
-        // Log but don't surface to user — the entry was already saved
-        cflog(
-            file = "blocklist",
-            type = "error",
-            text = "rbldnsd reload failed: #e.message#"
-        );
-    }
-}
-
 // ── Audit logging ─────────────────────────────────────────────────────────
 function writeAuditLog(
     required string action,

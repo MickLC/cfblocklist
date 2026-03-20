@@ -24,6 +24,19 @@ DNSBL_ZONE="dnsbl.whizardries.com"
 DNSBL_RETURN="127.0.0.2"
 DNSBL_TTL="300"
 
+# ── TXT record message ─────────────────────────────────────────────────────
+# Returned as the TXT record for listed entries.
+# Supports two placeholders:
+#   {zone}  — replaced with DNSBL_ZONE
+#   {cidr}  — replaced with the matching CIDR range (CIDR lookups only;
+#             empty string for exact-IP and hostname matches)
+#
+# Keep under 255 characters. Many MTAs log or display this message.
+# Examples:
+#   DNSBL_MESSAGE="Listed on {zone}. See https://dnsbl.example.com"
+#   DNSBL_MESSAGE="Blocked: spam source. Details: https://dnsbl.example.com"
+DNSBL_MESSAGE="Listed on {zone}"
+
 # ── Zone SOA/NS ────────────────────────────────────────────────────────────
 # These are used by the pipe backend to answer SOA and NS queries.
 # Must match what your authoritative zone record says.
@@ -41,5 +54,7 @@ NS_TTL="3600"
 # NS2_HOST="ns2.whizardries.com."
 
 # ── Logging ────────────────────────────────────────────────────────────────
+# Log file must be writable by the pdns user.
+# Create with: touch /var/log/dnsbl-pipe.log && chown pdns:pdns /var/log/dnsbl-pipe.log
 PIPE_LOG="/var/log/dnsbl-pipe.log"
 EXPIRE_LOG="/var/log/blocklist-expire.log"
