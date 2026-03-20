@@ -33,10 +33,6 @@ function verifyHash(required string password, required string stored) {
         256
     );
     // Constant-time comparison via java.security.MessageDigest.isEqual().
-    // A plain == check is vulnerable to timing attacks: the JVM short-circuits
-    // as soon as it finds the first differing character, leaking information
-    // about how much of the hash matched. MessageDigest.isEqual() always
-    // compares every byte regardless of where a mismatch occurs.
     var jMD = createObject("java", "java.security.MessageDigest");
     return jMD.isEqual(
         derived.getBytes("UTF-8"),
@@ -58,7 +54,6 @@ function isValidIPv4(required string addr) {
 }
 
 function isValidCIDR(required string addr) {
-    // Accepts "1.2.3.0/24" style
     if (!find('/', arguments.addr)) return false;
     var base = listFirst(arguments.addr, '/');
     var bits = val(listLast(arguments.addr, '/'));
@@ -66,9 +61,8 @@ function isValidCIDR(required string addr) {
 }
 
 function isValidHostname(required string addr) {
-    // Accepts plain hostnames and domain names, including leading dot for wildcard zones
     var s = trim(arguments.addr);
-    if (left(s, 1) == '.') s = mid(s, 2, len(s)-1); // strip leading dot
+    if (left(s, 1) == '.') s = mid(s, 2, len(s)-1);
     return reFind('^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$', s) GT 0;
 }
 
@@ -78,6 +72,81 @@ function detectEntryType(required string addr) {
     if (isValidIPv4(s))                           return 'ip';
     if (isValidHostname(s))                       return 'hostname';
     return 'unknown';
+}
+
+// ── Evidence redaction (public display only — raw text is preserved in DB) ──
+//
+// Removes information that could identify spamtrap addresses or internal
+// infrastructure. Applied only in evidence.cfm (public view); the admin
+// entry_edit.cfm always shows the unredacted original.
+//
+// Rules applied in order:
+//   1. Manual blocks:  [REDACT]...[/REDACT]  → [redacted]
+//   2. Recipient-revealing headers (whole line after the colon):
+//        To: / Cc: / Bcc: / X-Original-To: / Delivered-To:
+//        X-Forwarded-To: / Envelope-To: / X-Envelope-To:
+//        X-RCPT-To: / X-Spam-Rcpt:
+//   3. Return-Path: address (the angle-bracket envelope form)
+//   4. Received: lines — redact the "for <addr>" clause only,
+//      preserving the relay hop info which is the useful part
+//   5. Any remaining bare email address anywhere in the text
+//
+function redactEvidence(required string text) {
+    var s = arguments.text;
+
+    // 1. Manual redaction blocks (case-insensitive, spanning newlines)
+    s = reReplaceNoCase(s, '\[REDACT\].*?\[/REDACT\]', '[redacted]', 'ALL');
+
+    // 2. Headers that directly expose the recipient address.
+    //    Matches the header name at the start of a line (after optional
+    //    whitespace for folded headers), replaces everything after the colon.
+    var recipientHeaders =
+        'To|Cc|Bcc' &
+        '|X-Original-To|Delivered-To|X-Forwarded-To' &
+        '|Envelope-To|X-Envelope-To' &
+        '|X-RCPT-To|X-Spam-Rcpt';
+    s = reReplaceNoCase(
+        s,
+        '(?m)^([ \t]*(?:' & recipientHeaders & '):[ \t]*).*$',
+        '\1[redacted]',
+        'ALL'
+    );
+
+    // 3. Return-Path: redact the address inside angle brackets.
+    //    Keep the header name so the structure of the message is clear.
+    s = reReplaceNoCase(
+        s,
+        '(?m)^([ \t]*Return-Path:[ \t]*)<[^>]*>',
+        '\1<[redacted]>',
+        'ALL'
+    );
+
+    // 4. Received: "for" clause — e.g. "for <trap@example.com>;" or
+    //    "for trap@example.com;" — redact just the address, keep timestamps
+    //    and relay path which are the evidential parts.
+    s = reReplaceNoCase(
+        s,
+        '(\bfor\s+)<[^>]+>',
+        '\1<[redacted]>',
+        'ALL'
+    );
+    s = reReplaceNoCase(
+        s,
+        '(\bfor\s+)[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}',
+        '\1[redacted]',
+        'ALL'
+    );
+
+    // 5. Any remaining bare email address anywhere in the text.
+    //    This catches addresses in body fragments, log lines, custom fields, etc.
+    s = reReplaceNoCase(
+        s,
+        '[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}',
+        '[redacted]',
+        'ALL'
+    );
+
+    return s;
 }
 
 // ── Audit logging ─────────────────────────────────────────────────────────

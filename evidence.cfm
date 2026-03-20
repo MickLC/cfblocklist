@@ -1,6 +1,10 @@
 <!---
     evidence.cfm  —  Public evidence display for a blocklist entry
     URL param: ?id=<integer>
+
+    Evidence text is redacted before display to protect spamtrap addresses
+    and any other identifying recipient information. The raw text is preserved
+    unchanged in the database and remains fully visible in the admin UI.
 --->
 <cfinclude template="/config/settings.cfm">
 <cfinclude template="/includes/functions.cfm">
@@ -118,19 +122,25 @@ switch (entry.entry_type) {
             <span class="badge bg-secondary ms-1"><cfoutput>#evidenceRows.recordCount#</cfoutput></span>
         </h5>
 
+        <p class="text-muted small mb-3">
+            Some information has been redacted from the evidence below to protect
+            internal addressing details. The evidence otherwise reflects the original
+            messages and logs that resulted in this listing.
+        </p>
+
         <cfif evidenceRows.recordCount EQ 0>
             <div class="alert alert-info">No evidence records are attached to this entry.</div>
         <cfelse>
             <cfoutput query="evidenceRows">
                 <div class="card mb-3 shadow-sm">
                     <div class="card-header small text-muted">
-                        Evidence record ##<cfoutput>#evidenceRows.currentRow#</cfoutput>
-                        &mdash; added <cfoutput>#dateFormat(added_date,"mmm d, yyyy")# at #timeFormat(added_date,"h:mm tt")#</cfoutput>
+                        Evidence record ###evidenceRows.currentRow#
+                        &mdash; added #dateFormat(added_date,"mmm d, yyyy")# at #timeFormat(added_date,"h:mm tt")#
                     </div>
                     <div class="card-body p-0">
                         <div class="evidence-box rounded-bottom"
-                             style="border-top:0;border-radius:0 0 .375rem .375rem;padding:1rem;font-family:monospace;font-size:.85rem;white-space:pre-wrap;word-break:break-all;background:#fff">
-                            #encodeForHTML(evidence)#
+                             style="border-top:0;border-radius:0 0 .375rem .375rem;padding:1rem;font-family:monospace;font-size:.85rem;white-space:pre-wrap;word-break:break-all;background:##fff">
+                            #encodeForHTML(redactEvidence(evidence))#
                         </div>
                     </div>
                 </div>
