@@ -103,6 +103,12 @@ function detectEntryType(required string addr) {
 //
 //   6. darn= tag — leaks recipient domain; redact the value.
 //
+//   7. From: and To: headers — redact only the local part (before @) of
+//      any email address, leaving the @domain visible as evidence.
+//      The local part can encode the trap address (e.g. tagged addresses
+//      like se999955sdsdeeeedddd@spamrelay.com where the local part is
+//      derived from the trap). Display name and domain are preserved.
+//
 function redactEvidence(required string text) {
     var s = arguments.text;
 
@@ -113,11 +119,8 @@ function redactEvidence(required string text) {
     // 1. Manual redaction blocks
     s = reReplaceNoCase(s, '\[REDACT\].*?\[/REDACT\]', '[redacted]', 'ALL');
 
-    // 2. Recipient-revealing headers.
-    //    Pattern: anchored to ^ (column 0 only, not after whitespace),
-    //    matches the header value on the first line, then greedily consumes
-    //    any following folded continuation lines (lines starting with \t or space).
-    //    Uses Java Pattern directly for reliable multiline behaviour.
+    // 2. Recipient-revealing headers — entire value + folded continuations.
+    //    Anchored to column 0; uses Java Pattern for reliable multiline handling.
     var recipientHeaders =
         'Delivered-To' &
         '|X-Original-To' &
@@ -132,8 +135,6 @@ function redactEvidence(required string text) {
         '|List-Subscribe' &
         '|List-Unsubscribe';
 
-    // Build pattern: ^(HeaderName):[ \t]*[^\n]*(\n[ \t]+[^\n]*)*
-    // This matches the header line and any folded continuation lines.
     var jPattern = createObject('java', 'java.util.regex.Pattern');
     var jMatcher = jPattern.compile(
         '(?im)^(' & recipientHeaders & '):[ \t]*[^\n]*(\n[ \t]+[^\n]*)*'
@@ -174,6 +175,28 @@ function redactEvidence(required string text) {
 
     // 6. darn= tag — recipient domain.
     s = reReplaceNoCase(s, '(\bdarn=)[a-zA-Z0-9.\-]+', '\1[redacted]', 'ALL');
+
+    // 7. From: and To: — redact only the local part of email addresses.
+    //    The local part can encode the trap address via tagged/subaddressed
+    //    delivery. The @domain is kept as it identifies the sending infrastructure.
+    //    Handles both bare addr@domain and display name <addr@domain> forms.
+    //    Applied only to lines starting with From: or To: at column 0.
+    var fromToPattern = jPattern.compile(
+        '(?im)^((?:From|To):.*?)[a-zA-Z0-9._%+\-]+(@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})'
+    );
+    var fromToMatcher = fromToPattern.matcher(s);
+    var sb2 = createObject('java', 'java.lang.StringBuffer').init();
+    while (fromToMatcher.find()) {
+        fromToMatcher.appendReplacement(sb2,
+            javaCast('string',
+                fromToMatcher.group(1).replaceAll('\\$', '\\\$') &
+                '[redacted]' &
+                fromToMatcher.group(2).replaceAll('\\$', '\\\$')
+            )
+        );
+    }
+    fromToMatcher.appendTail(sb2);
+    s = sb2.toString();
 
     return s;
 }
