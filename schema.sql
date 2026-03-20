@@ -18,12 +18,16 @@ CREATE TABLE IF NOT EXISTS ip (
     added_date  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     added_by    INT UNSIGNED NULL,               -- FK to login.id
     modified_date DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
-    modified_by INT UNSIGNED NULL,
+    modified_by  INT UNSIGNED NULL,
+    expires      DATETIME NULL,              -- NULL = never expires; auto-set from defaultExpiryDays
+    auto_expire  TINYINT(1) NOT NULL DEFAULT 1, -- 0 = exempt from auto-expiry (locked entries always exempt regardless)
+    last_hit     DATETIME NULL,              -- last web lookup hit; expiry measured from here if set
     PRIMARY KEY (id),
     UNIQUE KEY uq_address_cidr (address, cidr),
     KEY idx_entry_type (entry_type),
     KEY idx_locked (locked),
-    KEY idx_active (active)
+    KEY idx_active (active),
+    KEY idx_expires (expires)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
@@ -132,6 +136,31 @@ SET @exist = (SELECT COUNT(*) FROM information_schema.COLUMNS
 SET @sql = IF(@exist=0,
     'ALTER TABLE ip ADD COLUMN modified_by INT UNSIGNED NULL AFTER modified_date',
     'SELECT ''modified_by already exists''');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+
+-- ip.expires
+SET @exist = (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA=@dbname AND TABLE_NAME='ip' AND COLUMN_NAME='expires');
+SET @sql = IF(@exist=0,
+    'ALTER TABLE ip ADD COLUMN expires DATETIME NULL AFTER modified_by',
+    'SELECT ''expires already exists''');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ip.auto_expire
+SET @exist = (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA=@dbname AND TABLE_NAME='ip' AND COLUMN_NAME='auto_expire');
+SET @sql = IF(@exist=0,
+    'ALTER TABLE ip ADD COLUMN auto_expire TINYINT(1) NOT NULL DEFAULT 1 AFTER expires',
+    'SELECT ''auto_expire already exists''');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ip.last_hit
+SET @exist = (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA=@dbname AND TABLE_NAME='ip' AND COLUMN_NAME='last_hit');
+SET @sql = IF(@exist=0,
+    'ALTER TABLE ip ADD COLUMN last_hit DATETIME NULL AFTER auto_expire',
+    'SELECT ''last_hit already exists''');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Backfill entry_type for existing rows where cidr IS NOT NULL → 'cidr', else → 'ip'

@@ -40,6 +40,13 @@ application.rbldnsdReloadScript = "/opt/blocklist/reload-rbldnsd.sh";
 // Set to true to receive an admin notification email on every self-delist.
 application.delistNotifyAdmin = true;
 
+
+// ── Entry expiry ────────────────────────────────────────────────────────────
+// Default number of days before an unlocked, active entry is automatically
+// deactivated. Applied when a new entry is created.
+// Set to 0 to default new entries to never-expire (can still be set per entry).
+// Locked entries are always exempt from auto-expiry regardless of this setting.
+application.defaultExpiryDays = 90;
 // ── Pagination ──────────────────────────────────────────────────────────────
 application.pageSize = 25;
 

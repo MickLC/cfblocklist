@@ -22,7 +22,7 @@
 
 <!--- Fetch entry --->
 <cfquery datasource="#application.dsn#" name="entry">
-    SELECT  i.id, i.entry_type, i.address, i.cidr, i.locked, i.active,
+    SELECT  i.id, i.entry_type, i.address, i.cidr, i.locked, i.active, i.expires, i.auto_expire, i.last_hit,
             i.added_date, i.modified_date,
             l.name AS added_by_name
     FROM    ip i
@@ -44,6 +44,28 @@ displayEntry = entry.entry_type EQ "cidr"
 <!--- ── Process form actions ────────────────────────────────────────────── --->
 <cfif len(form.action)>
     <cfswitch expression="#form.action#">
+
+        <!--- Update expiry settings --->
+        <cfcase value="setexpiry">
+            <cfset newAutoExpire = (form.auto_expire EQ "1") ? 1 : 0>
+            <cfquery datasource="#application.dsn#">
+                UPDATE ip
+                SET auto_expire  = <cfqueryparam value="#newAutoExpire#" cfsqltype="cf_sql_tinyint">,
+                    expires      = <cfif len(trim(form.expires)) AND isDate(trim(form.expires))>
+                                       <cfqueryparam value="#dateFormat(trim(form.expires),'yyyy-mm-dd')# 23:59:59" cfsqltype="cf_sql_timestamp">
+                                   <cfelse>NULL</cfif>,
+                    modified_by  = <cfqueryparam value="#session.adminId#" cfsqltype="cf_sql_integer">,
+                    modified_date = NOW()
+                WHERE id = <cfqueryparam value="#entryId#" cfsqltype="cf_sql_integer">
+            </cfquery>
+            <cfset writeAuditLog(action="EDIT", target=displayEntry, entryType=entry.entry_type,
+                detail="Expiry updated: expires=#form.expires#, auto_expire=#newAutoExpire#")>
+            <cfset successMsg = "Expiry settings updated.">
+            <cfquery datasource="#application.dsn#" name="entry">
+                SELECT i.*, l.name AS added_by_name FROM ip i LEFT JOIN login l ON i.added_by = l.id
+                WHERE i.id = <cfqueryparam value="#entryId#" cfsqltype="cf_sql_integer"> LIMIT 1
+            </cfquery>
+        </cfcase>
 
         <!--- Activate / deactivate --->
         <cfcase value="setactive">
@@ -194,6 +216,17 @@ displayEntry = entry.entry_type EQ "cidr"
                     </dd>
                     <dt class="col-5">Added</dt>
                     <dd class="col-7 text-muted"><cfoutput>#dateFormat(entry.added_date,"mmm d, yyyy")#</cfoutput></dd>
+                    <dt class="col-5">Expires</dt>
+                    <dd class="col-7 text-muted">
+                        <cfif isDate(entry.expires)>
+                            <cfoutput>#dateFormat(entry.expires,"mmm d, yyyy")#</cfoutput>
+                            <cfif entry.expires LT now()>
+                                <span class="badge bg-warning text-dark ms-1">Overdue</span>
+                            </cfif>
+                        <cfelse>
+                            <span class="text-muted">Never</span>
+                        </cfif>
+                    </dd>
                     <dt class="col-5">By</dt>
                     <dd class="col-7 text-muted"><cfoutput>#encodeForHTML(entry.added_by_name)#</cfoutput></dd>
                 </dl>
@@ -226,6 +259,43 @@ displayEntry = entry.entry_type EQ "cidr"
                         </label>
                     </div>
                     <button type="submit" class="btn btn-sm btn-outline-secondary w-100">Save lock status</button>
+                </form>
+            </div>
+        </div>
+
+        <!--- Expiry control --->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header fw-semibold">Auto-expiry</div>
+            <div class="card-body">
+                <p class="small text-muted mb-2">
+                    Locked entries never auto-expire regardless of these settings.
+                    <cfif isDefined("entry.last_hit") AND isDate(entry.last_hit)>
+                        <br>Last web lookup hit: <cfoutput>#dateFormat(entry.last_hit,"mmm d, yyyy")# #timeFormat(entry.last_hit,"H:mm")#</cfoutput>
+                    </cfif>
+                </p>
+                <form method="post" action="/admin/entry_edit.cfm?id=<cfoutput>#encodeForURL(entryId)#</cfoutput>">
+                    <input type="hidden" name="action" value="setexpiry">
+                    <div class="mb-2">
+                        <label class="form-label small mb-1">Expiry date</label>
+                        <input  type="date"
+                                class="form-control form-control-sm"
+                                name="expires"
+                                value="<cfoutput><cfif isDate(entry.expires)>#dateFormat(entry.expires,'yyyy-mm-dd')#</cfif></cfoutput>">
+                        <div class="form-text">Leave blank for no expiry.</div>
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                        <input  class="form-check-input"
+                                type="checkbox"
+                                role="switch"
+                                id="auto_expire"
+                                name="auto_expire"
+                                value="1"
+                                <cfif entry.auto_expire>checked</cfif>>
+                        <label class="form-check-label small" for="auto_expire">
+                            Auto-expire when date is reached
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-outline-secondary w-100">Save expiry</button>
                 </form>
             </div>
         </div>

@@ -122,7 +122,27 @@ Values to set:
 | `application.delistNotifyAdmin` | `true` to email admin on every self-delist |
 | `application.pepperFile` | Full path to pepper file (Option B above); `""` if unused |
 
-### 5. Set up the rbldnsd reload script
+### 5. Set up rbldnsd scripts
+
+```bash
+cp reload-rbldnsd.sh /opt/blocklist/reload-rbldnsd.sh
+cp generate-zone.sh  /opt/blocklist/generate-zone.sh
+cp expire-entries.sh /opt/blocklist/expire-entries.sh
+chmod +x /opt/blocklist/*.sh
+```
+
+Edit the `DB_HOST`, `DB_USER`, and `DB_NAME` variables at the top of both
+`generate-zone.sh` and `expire-entries.sh` to match your environment.
+Configure the database password via `~/.my.cnf` (see comments in the scripts).
+
+Add the expiry cron job to Harry:
+
+```bash
+# Run daily at 3am
+0 3 * * * /opt/blocklist/expire-entries.sh
+```
+
+### 5a. Set up the rbldnsd reload script
 
 ```bash
 cp reload-rbldnsd.sh /opt/blocklist/reload-rbldnsd.sh
@@ -153,6 +173,8 @@ Go to `/admin/` and log in with the credentials created in step 6.
 ├── initialize.cfm           # First-run admin user creation
 ├── schema.sql               # MariaDB schema + migration (idempotent)
 ├── reload-rbldnsd.sh        # rbldnsd SIGHUP reload script
+├── generate-zone.sh         # generates rbldnsd zone files from MariaDB
+├── expire-entries.sh        # daily cron: deactivates expired entries
 ├── .gitignore
 │
 ├── config/

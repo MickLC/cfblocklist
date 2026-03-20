@@ -111,7 +111,7 @@
 
 <!--- ── Fetch page of entries ───────────────────────────────────────────── --->
 <cfquery datasource="#application.dsn#" name="entries">
-    SELECT  i.id, i.entry_type, i.address, i.cidr, i.locked, i.active,
+    SELECT  i.id, i.entry_type, i.address, i.cidr, i.locked, i.active, i.expires, i.auto_expire,
             i.added_date, i.modified_date,
             l.name AS added_by_name,
             (SELECT COUNT(*) FROM evidence e WHERE e.ip_id = i.id) AS evidence_count
@@ -207,6 +207,7 @@
                     <th>Type</th>
                     <th>Lock</th>
                     <th>Active</th>
+                    <th>Expires</th>
                     <th>Evidence</th>
                     <th>Added</th>
                     <th>By</th>
@@ -239,6 +240,17 @@
                             <span class="badge bg-success">Active</span>
                         <cfelse>
                             <span class="badge bg-secondary">Inactive</span>
+                        </cfif>
+                    </td>
+                    <td class="small text-nowrap">
+                        <cfif isDate(expires)>
+                            <cfif expires LT now()>
+                                <span class="text-warning"><cfoutput>#dateFormat(expires,"mmm d, yy")#</cfoutput></span>
+                            <cfelse>
+                                <cfoutput>#dateFormat(expires,"mmm d, yy")#</cfoutput>
+                            </cfif>
+                        <cfelse>
+                            <span class="text-muted">—</span>
                         </cfif>
                     </td>
                     <td class="text-center">
@@ -292,7 +304,7 @@
 
                 <cfif entries.recordCount EQ 0>
                     <tr>
-                        <td colspan="8" class="text-center text-muted py-4">
+                        <td colspan="9" class="text-center text-muted py-4">
                             No entries match your filter.
                         </td>
                     </tr>

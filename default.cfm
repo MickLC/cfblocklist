@@ -18,9 +18,12 @@
     <cfset searched  = true>
     <cfset lookupVal = trim(form.query)>
 
+    <!--- Record last_hit for positive lookups — used by expiry script --->
+    <!--- (done after query below, see hit tracking block) --->
     <!--- Determine what kind of thing was looked up --->
     <cfset lType = detectEntryType(lookupVal)>
 
+    <cfset hitTracked = false>
     <cfif lType EQ "ip" OR lType EQ "cidr">
         <!--- IPv4 lookup: exact match OR falls within a CIDR range --->
         <cfquery datasource="#application.dsn#" name="checkResult">

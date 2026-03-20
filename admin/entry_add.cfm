@@ -7,10 +7,17 @@
 
 <cfparam name="form.address"  default="">
 <cfparam name="form.locked"   default="0">
-<cfparam name="form.evidence" default="">
+<cfparam name="form.evidence"   default="">
+<cfparam name="form.auto_expire" default="1">
+<cfparam name="form.expires"     default="">
 <cfparam name="form.submit"   default="">
 
 <cfset formErrors  = []>
+
+<!--- Pre-populate expiry date from default setting --->
+<cfif NOT len(form.expires) AND application.defaultExpiryDays GT 0>
+    <cfset form.expires = dateFormat(dateAdd("d", application.defaultExpiryDays, now()), "yyyy-mm-dd")>
+</cfif>
 <cfset successMsg  = "">
 
 <cfif len(form.submit)>
@@ -57,7 +64,7 @@
     <!--- Insert --->
     <cfif NOT arrayLen(formErrors)>
         <cfquery datasource="#application.dsn#" name="insertEntry" result="insertResult">
-            INSERT INTO ip (entry_type, address, cidr, locked, active, added_by)
+            INSERT INTO ip (entry_type, address, cidr, locked, active, expires, auto_expire, added_by)
             VALUES (
                 <cfqueryparam value="#detectedType#" cfsqltype="cf_sql_varchar" maxlength="16">,
                 <cfqueryparam value="#cidrBase#"     cfsqltype="cf_sql_varchar" maxlength="253">,
@@ -68,6 +75,12 @@
                 </cfif>,
                 <cfqueryparam value="#val(form.locked)#" cfsqltype="cf_sql_tinyint">,
                 1,
+                <cfif len(trim(form.expires)) AND isDate(trim(form.expires))>
+                    <cfqueryparam value="#dateFormat(trim(form.expires),'yyyy-mm-dd')# 23:59:59" cfsqltype="cf_sql_timestamp">
+                <cfelse>
+                    NULL
+                </cfif>,
+                <cfqueryparam value="#(form.auto_expire EQ '1') ? 1 : 0#" cfsqltype="cf_sql_tinyint">,
                 <cfqueryparam value="#session.adminId#"  cfsqltype="cf_sql_integer">
             )
         </cfquery>
