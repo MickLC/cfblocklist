@@ -85,25 +85,25 @@ function detectEntryType(required string addr) {
 //   1. Manual blocks: [REDACT]...[/REDACT] → [redacted]
 //      Escape hatch for anything not covered by the rules below.
 //
-//   2. Headers that directly name the recipient (entire value redacted):
-//        Delivered-To:       — local delivery address
-//        X-Original-To:      — pre-alias recipient
-//        X-Forwarded-To:     — forwarding destination
-//        Envelope-To:        — SMTP envelope recipient
-//        X-Envelope-To:      — same, alternate header name
-//        X-RCPT-To:          — same, used by some MTAs
-//        X-Spam-Rcpt:        — SpamAssassin recipient annotation
+//   2. Headers whose entire value is redacted (recipient-revealing):
+//        Delivered-To, X-Original-To, X-Forwarded-To
+//        Envelope-To, X-Envelope-To, X-RCPT-To, X-Spam-Rcpt
+//        X-Forwarded-Encrypted  — encrypted blob contains recipient domain
+//        X-BeenThere            — Google Groups list address, reveals trap
+//        X-Spam-Checked-In-Group — explicit trap address
 //
-//   3. Return-Path: — redact only the address inside <>, keep the header.
-//      The envelope sender is sometimes useful; the angle-bracket form
-//      is the only part that could contain our address in edge cases.
+//   3. Return-Path: — redact only the <address> inside angle brackets.
 //
-//   4. Received: "for <addr>" clause — redact only the address; the full
-//      relay hop (IPs, hostnames, timestamps) is preserved as evidence.
+//   4. Received: continuation lines with (envelope-from <addr>) — redact
+//      only the address; the rest of the hop is preserved.
 //
-//   Everything else — From:, To: (as sent by the spammer), Subject:,
-//   authentication headers (DKIM, SPF, DMARC results), message-id,
-//   body content, log lines — is shown as-is.
+//   5. Received: "for <addr>" / "for addr" clause — redact address only.
+//
+//   6. DKIM-Signature / ARC-* / X-Google-DKIM-Signature: darn= tag —
+//      leaks the recipient domain; redact the value after darn=.
+//
+//   Everything else — From:, To: (spammer's), Subject:, SPF/DKIM/DMARC
+//   results, relay IPs, timestamps, message body — is shown as-is.
 //
 function redactEvidence(required string text) {
     var s = arguments.text;
@@ -111,8 +111,8 @@ function redactEvidence(required string text) {
     // 1. Manual redaction blocks (case-insensitive, spanning newlines)
     s = reReplaceNoCase(s, '\[REDACT\].*?\[/REDACT\]', '[redacted]', 'ALL');
 
-    // 2. Recipient-revealing headers — whole value replaced.
-    //    Anchored to start of line to avoid matching mid-line occurrences.
+    // 2. Headers whose entire value reveals the recipient — whole line
+    //    value replaced. Anchored to start of line.
     var recipientHeaders =
         'Delivered-To' &
         '|X-Original-To' &
@@ -120,7 +120,10 @@ function redactEvidence(required string text) {
         '|Envelope-To' &
         '|X-Envelope-To' &
         '|X-RCPT-To' &
-        '|X-Spam-Rcpt';
+        '|X-Spam-Rcpt' &
+        '|X-Forwarded-Encrypted' &
+        '|X-BeenThere' &
+        '|X-Spam-Checked-In-Group';
     s = reReplaceNoCase(
         s,
         '(?m)^([ \t]*(?:' & recipientHeaders & '):[ \t]*).*$',
@@ -136,12 +139,30 @@ function redactEvidence(required string text) {
         'ALL'
     );
 
-    // 4. Received: "for" clause — redact address, preserve rest of line.
+    // 4. Received: continuation lines — (envelope-from <addr>) clause.
+    //    These appear as indented continuation lines inside a Received: block.
+    s = reReplaceNoCase(
+        s,
+        '(\(envelope-from\s+)<[^>]*>(\))',
+        '\1<[redacted]>\2',
+        'ALL'
+    );
+
+    // 5. Received: "for" clause — redact address, preserve rest of line.
     //    Handles both "for <addr>" and bare "for addr" forms.
     s = reReplaceNoCase(s, '(\bfor\s+)<[^>]+>', '\1<[redacted]>', 'ALL');
     s = reReplaceNoCase(
         s,
         '(\bfor\s+)[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}',
+        '\1[redacted]',
+        'ALL'
+    );
+
+    // 6. darn= tag in DKIM-Signature and ARC-* headers — value is the
+    //    recipient domain (e.g. darn=lexprotego.com). Redact the domain.
+    s = reReplaceNoCase(
+        s,
+        '(\bdarn=)[a-zA-Z0-9.\-]+',
         '\1[redacted]',
         'ALL'
     );
