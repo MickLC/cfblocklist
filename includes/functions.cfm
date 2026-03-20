@@ -76,20 +76,34 @@ function detectEntryType(required string addr) {
 
 // ── Evidence redaction (public display only — raw text is preserved in DB) ──
 //
-// Removes information that could identify spamtrap addresses or internal
-// infrastructure. Applied only in evidence.cfm (public view); the admin
-// entry_edit.cfm always shows the unredacted original.
+// Goal: protect the spamtrap recipient address without hiding anything else.
+// Sender addresses, relay hops, authentication results, message body, and
+// all other headers are left intact — they are the evidence.
 //
 // Rules applied in order:
-//   1. Manual blocks:  [REDACT]...[/REDACT]  → [redacted]
-//   2. Recipient-revealing headers (whole line after the colon):
-//        To: / Cc: / Bcc: / X-Original-To: / Delivered-To:
-//        X-Forwarded-To: / Envelope-To: / X-Envelope-To:
-//        X-RCPT-To: / X-Spam-Rcpt:
-//   3. Return-Path: address (the angle-bracket envelope form)
-//   4. Received: lines — redact the "for <addr>" clause only,
-//      preserving the relay hop info which is the useful part
-//   5. Any remaining bare email address anywhere in the text
+//
+//   1. Manual blocks: [REDACT]...[/REDACT] → [redacted]
+//      Escape hatch for anything not covered by the rules below.
+//
+//   2. Headers that directly name the recipient (entire value redacted):
+//        Delivered-To:       — local delivery address
+//        X-Original-To:      — pre-alias recipient
+//        X-Forwarded-To:     — forwarding destination
+//        Envelope-To:        — SMTP envelope recipient
+//        X-Envelope-To:      — same, alternate header name
+//        X-RCPT-To:          — same, used by some MTAs
+//        X-Spam-Rcpt:        — SpamAssassin recipient annotation
+//
+//   3. Return-Path: — redact only the address inside <>, keep the header.
+//      The envelope sender is sometimes useful; the angle-bracket form
+//      is the only part that could contain our address in edge cases.
+//
+//   4. Received: "for <addr>" clause — redact only the address; the full
+//      relay hop (IPs, hostnames, timestamps) is preserved as evidence.
+//
+//   Everything else — From:, To: (as sent by the spammer), Subject:,
+//   authentication headers (DKIM, SPF, DMARC results), message-id,
+//   body content, log lines — is shown as-is.
 //
 function redactEvidence(required string text) {
     var s = arguments.text;
@@ -97,14 +111,16 @@ function redactEvidence(required string text) {
     // 1. Manual redaction blocks (case-insensitive, spanning newlines)
     s = reReplaceNoCase(s, '\[REDACT\].*?\[/REDACT\]', '[redacted]', 'ALL');
 
-    // 2. Headers that directly expose the recipient address.
-    //    Matches the header name at the start of a line (after optional
-    //    whitespace for folded headers), replaces everything after the colon.
+    // 2. Recipient-revealing headers — whole value replaced.
+    //    Anchored to start of line to avoid matching mid-line occurrences.
     var recipientHeaders =
-        'To|Cc|Bcc' &
-        '|X-Original-To|Delivered-To|X-Forwarded-To' &
-        '|Envelope-To|X-Envelope-To' &
-        '|X-RCPT-To|X-Spam-Rcpt';
+        'Delivered-To' &
+        '|X-Original-To' &
+        '|X-Forwarded-To' &
+        '|Envelope-To' &
+        '|X-Envelope-To' &
+        '|X-RCPT-To' &
+        '|X-Spam-Rcpt';
     s = reReplaceNoCase(
         s,
         '(?m)^([ \t]*(?:' & recipientHeaders & '):[ \t]*).*$',
@@ -112,8 +128,7 @@ function redactEvidence(required string text) {
         'ALL'
     );
 
-    // 3. Return-Path: redact the address inside angle brackets.
-    //    Keep the header name so the structure of the message is clear.
+    // 3. Return-Path: redact only the <address> portion.
     s = reReplaceNoCase(
         s,
         '(?m)^([ \t]*Return-Path:[ \t]*)<[^>]*>',
@@ -121,28 +136,13 @@ function redactEvidence(required string text) {
         'ALL'
     );
 
-    // 4. Received: "for" clause — e.g. "for <trap@example.com>;" or
-    //    "for trap@example.com;" — redact just the address, keep timestamps
-    //    and relay path which are the evidential parts.
-    s = reReplaceNoCase(
-        s,
-        '(\bfor\s+)<[^>]+>',
-        '\1<[redacted]>',
-        'ALL'
-    );
+    // 4. Received: "for" clause — redact address, preserve rest of line.
+    //    Handles both "for <addr>" and bare "for addr" forms.
+    s = reReplaceNoCase(s, '(\bfor\s+)<[^>]+>', '\1<[redacted]>', 'ALL');
     s = reReplaceNoCase(
         s,
         '(\bfor\s+)[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}',
         '\1[redacted]',
-        'ALL'
-    );
-
-    // 5. Any remaining bare email address anywhere in the text.
-    //    This catches addresses in body fragments, log lines, custom fields, etc.
-    s = reReplaceNoCase(
-        s,
-        '[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}',
-        '[redacted]',
         'ALL'
     );
 
