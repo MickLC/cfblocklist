@@ -82,6 +82,11 @@ function detectEntryType(required string addr) {
 //
 // Rules applied in order:
 //
+//   0. Normalize CRLF → LF so that ^ and $ anchors work reliably.
+//      Email headers stored from Windows/Outlook clients or passed through
+//      certain MTAs arrive with \r\n line endings; Java regex (?m) mode
+//      only treats \n as a line boundary, so \r\n breaks all anchored rules.
+//
 //   1. Manual blocks: [REDACT]...[/REDACT] → [redacted]
 //      Escape hatch for anything not covered by the rules below.
 //
@@ -107,6 +112,12 @@ function detectEntryType(required string addr) {
 //
 function redactEvidence(required string text) {
     var s = arguments.text;
+
+    // 0. Normalize line endings — CRLF and bare CR → LF.
+    //    Java regex (?m) only recognises \n as a line boundary; \r\n causes
+    //    ^ and $ anchors to fail, leaving every header-based rule ineffective.
+    s = replace(s, chr(13) & chr(10), chr(10), 'ALL');
+    s = replace(s, chr(13), chr(10), 'ALL');
 
     // 1. Manual redaction blocks (case-insensitive, spanning newlines)
     s = reReplaceNoCase(s, '\[REDACT\].*?\[/REDACT\]', '[redacted]', 'ALL');
