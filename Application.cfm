@@ -64,7 +64,7 @@
          chmod 600 /home/youruser/.blocklist/pepper.txt
 
        Then set the full path in config/settings.cfm:
-         application.pepperFile = "/home/youruser/.blocklist/pepper.txt";
+         application.pepperFile = "/var/www/cfblocklist/private/pepper.txt";
 
     Generate a suitable value with:  openssl rand -hex 32
 
@@ -132,7 +132,7 @@
                     the pepper value, then set its path in
                     <code>config/settings.cfm</code>:
                 </p>
-                <pre class="bg-white border rounded p-2">application.pepperFile = "/home/youruser/.blocklist/pepper.txt";</pre>
+                <pre class="bg-white border rounded p-2">application.pepperFile = "/var/www/cfblocklist/private/pepper.txt";</pre>
                 <hr>
                 <p class="mb-0">
                     Generate a value: <code>openssl rand -hex 32</code>

@@ -37,9 +37,10 @@ location ^~ /config/ {
     deny all;
     return 403;
 }
+
 ```
 
-Place this block **before** your main `location` block so it takes precedence.
+Place these blocks **before** your main `location` block so they take precedence.
 
 ## Installation
 
@@ -73,19 +74,20 @@ Restart Lucee after editing. No root needed if you own the Lucee installation.
 
 #### Option B — Flat file above the web root
 
-Create a plain-text file **outside** your web root containing only the pepper value:
+Create a plain-text file **outside** the web root where no web server
+configuration can ever serve it:
 
 ```bash
-# Example: web root is /home/youruser/public_html
-mkdir -p /home/youruser/.blocklist
-echo "your-generated-hex-string" > /home/youruser/.blocklist/pepper.txt
-chmod 600 /home/youruser/.blocklist/pepper.txt
+mkdir -p /var/www/.blocklist
+echo "your-generated-hex-string" > /var/www/.blocklist/pepper.txt
+chown www-data:www-data /var/www/.blocklist/pepper.txt
+chmod 600 /var/www/.blocklist/pepper.txt
 ```
 
 Then set the path in `config/settings.cfm`:
 
 ```coldfusion
-application.pepperFile = "/home/youruser/.blocklist/pepper.txt";
+application.pepperFile = "/var/www/.blocklist/pepper.txt";
 ```
 
 The application checks Option A first, then Option B. If neither is configured
@@ -94,7 +96,7 @@ it displays a clear setup error page and refuses to start.
 ### 3. Run the schema migration
 
 ```bash
-mysql -h <your-db-host> -u <user> -p blocklist < schema.sql
+mysql -h <your-db-host> -u <user> -p blocklist < scripts/schema.sql
 ```
 
 Safe to run against an existing database — all statements are idempotent.
@@ -125,28 +127,31 @@ Values to set:
 ### 5. Set up rbldnsd scripts
 
 ```bash
-cp reload-rbldnsd.sh /opt/blocklist/reload-rbldnsd.sh
-cp generate-zone.sh  /opt/blocklist/generate-zone.sh
-cp expire-entries.sh /opt/blocklist/expire-entries.sh
-chmod +x /opt/blocklist/*.sh
+cp -r scripts/ /opt/blocklist/
+chmod +x /opt/blocklist/scripts/*.sh
 ```
 
-Edit the `DB_HOST`, `DB_USER`, and `DB_NAME` variables at the top of both
-`generate-zone.sh` and `expire-entries.sh` to match your environment.
-Configure the database password via `~/.my.cnf` (see comments in the scripts).
+Copy the config template and fill in your values:
 
-Add the expiry cron job to Harry:
+```bash
+cp /opt/blocklist/scripts/blocklist.conf.example /opt/blocklist/blocklist.conf
+chmod 640 /opt/blocklist/blocklist.conf
+chown root:www-data /opt/blocklist/blocklist.conf
+# edit /opt/blocklist/blocklist.conf with your DB host, credentials, zone names
+```
+
+Add the expiry cron job:
 
 ```bash
 # Run daily at 3am
-0 3 * * * /opt/blocklist/expire-entries.sh
+0 3 * * * /opt/blocklist/scripts/expire-entries.sh
 ```
 
 ### 5a. Set up the rbldnsd reload script
 
 ```bash
-cp reload-rbldnsd.sh /opt/blocklist/reload-rbldnsd.sh
-chmod +x /opt/blocklist/reload-rbldnsd.sh
+cp reload-rbldnsd.sh /opt/blocklist/scripts/reload-rbldnsd.sh
+chmod +x /opt/blocklist/scripts/reload-rbldnsd.sh
 ```
 
 No sudo needed if the Lucee service user owns the rbldnsd process.
@@ -172,7 +177,13 @@ Go to `/admin/` and log in with the credentials created in step 6.
 ├── about.cfm                # Public about/policy page
 ├── initialize.cfm           # First-run admin user creation
 ├── schema.sql               # MariaDB schema + migration (idempotent)
-├── reload-rbldnsd.sh        # rbldnsd SIGHUP reload script
+├── scripts/                 # Deployment scripts (web-protected)
+│   ├── schema.sql           # MariaDB schema + migration (idempotent)
+│   ├── reload-rbldnsd.sh    # rbldnsd SIGHUP reload script
+│   ├── generate-zone.sh     # generates rbldnsd zone files from MariaDB
+│   ├── expire-entries.sh    # daily cron: deactivates expired entries
+│   └── blocklist.conf.example  # template for /opt/blocklist/blocklist.conf
+├── blocklist.conf.example   # template for /etc/blocklist/blocklist.conf
 ├── generate-zone.sh         # generates rbldnsd zone files from MariaDB
 ├── expire-entries.sh        # daily cron: deactivates expired entries
 ├── .gitignore

@@ -1,0 +1,44 @@
+# /opt/blocklist/blocklist.conf
+#
+# Runtime configuration for cfblocklist shell scripts.
+# This file is NOT committed to version control — it contains
+# environment-specific values and database credentials.
+#
+# Setup:
+#   cp blocklist.conf.example /opt/blocklist/blocklist.conf
+#   chmod 640 /opt/blocklist/blocklist.conf
+#   chown root:www-data /opt/blocklist/blocklist.conf
+#   # Edit with your actual values
+
+# ── Database connection ────────────────────────────────────────────────────
+DB_HOST="your-db-host"
+DB_PORT="3306"
+DB_NAME="blocklist"
+DB_USER="blocklist_app"
+DB_PASS="your-password"
+
+# ── Zone file paths ────────────────────────────────────────────────────────
+ZONE_DIR="/var/lib/rbldns"
+
+# ── Zone SOA/NS ────────────────────────────────────────────────────────────
+# All times in seconds — rbldnsd does not accept BIND shorthand like 1h or 1d.
+# Serial 0 is intentional: rbldnsd substitutes the file's mtime automatically.
+SOA_ORIGIN="ns1.dnsbl.example.com."
+SOA_HOSTMASTER="hostmaster.example.com."
+SOA_TTL=3600
+SOA_REFRESH=3600
+SOA_RETRY=600
+SOA_EXPIRE=86400
+SOA_MINTTL=3600
+
+NS_HOST="ns1.dnsbl.example.com."
+NS_TTL=3600
+
+# ── Return value for listed entries ───────────────────────────────────────
+DNSBL_RETURN="127.0.0.2"
+DNSBL_ZONE="dnsbl.example.com"
+
+# ── Paths ──────────────────────────────────────────────────────────────────
+RBLDNSD_PIDFILE="/var/run/rbldnsd.pid"
+RELOAD_LOG="/var/log/rbldnsd-reload.log"
+EXPIRE_LOG="/var/log/blocklist-expire.log"

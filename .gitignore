@@ -1,5 +1,13 @@
 # cfblocklist .gitignore
 
+# Runtime config for /opt/blocklist scripts — contains DB credentials
+blocklist.conf
+
+
+# Your live blocklist config — copy blocklist.conf.example to /etc/blocklist/blocklist.conf
+# Never committed; the .example file is the committed template.
+/etc/blocklist/blocklist.conf
+
 # Your live settings file — copy settings.example.cfm to settings.cfm and fill it in.
 # Never committed; settings.example.cfm is the committed template.
 config/settings.cfm

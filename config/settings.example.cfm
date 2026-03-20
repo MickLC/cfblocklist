@@ -25,7 +25,7 @@ application.dnsZone = "bl.example.com";
 // Leave as "" if you are using the environment variable method instead.
 // See Application.cfm for full setup instructions.
 application.pepperFile = "";
-// Example: application.pepperFile = "/home/youruser/.blocklist/pepper.txt";
+// Example: application.pepperFile = "/var/www/cfblocklist/private/pepper.txt";
 
 // ── rbldnsd reload ─────────────────────────────────────────────────────────
 // Full path to the shell script that signals rbldnsd to reload.
@@ -33,7 +33,7 @@ application.pepperFile = "";
 // No sudo needed if the Lucee service user owns the rbldnsd process,
 // or if a sudo rule is in place for this specific script.
 // Set to "" to disable automatic reload (reload manually instead).
-application.rbldnsdReloadScript = "/opt/blocklist/reload-rbldnsd.sh";
+application.rbldnsdReloadScript = "/opt/blocklist/scripts/reload-rbldnsd.sh";
 
 // ── Self-delist settings ────────────────────────────────────────────────────
 // One-click delist for unlocked entries — immediate, no email confirmation.
