@@ -87,9 +87,7 @@ function detectEntryType(required string addr) {
 //   1. Manual blocks: [REDACT]...[/REDACT] → [redacted]
 //
 //   2. Headers whose entire value is redacted (recipient-revealing).
-//      Anchored to column 0 (no leading whitespace) to avoid matching
-//      folded continuation lines. Folded continuations (lines starting
-//      with \t or space) that follow a matched header are also consumed.
+//      Anchored to column 0; folded continuations also consumed.
 //        Delivered-To, X-Original-To, X-Forwarded-To
 //        Envelope-To, X-Envelope-To, X-RCPT-To, X-Spam-Rcpt
 //        X-Forwarded-Encrypted, X-BeenThere, X-Spam-Checked-In-Group
@@ -103,11 +101,12 @@ function detectEntryType(required string addr) {
 //
 //   6. darn= tag — leaks recipient domain; redact the value.
 //
-//   7. From: and To: headers — redact only the local part (before @) of
-//      any email address, leaving the @domain visible as evidence.
-//      The local part can encode the trap address (e.g. tagged addresses
-//      like se999955sdsdeeeedddd@spamrelay.com where the local part is
-//      derived from the trap). Display name and domain are preserved.
+//   7. From: and To: — redact local part of email addresses only,
+//      keeping @domain visible as evidence.
+//
+//   8. Message-ID: — redact local part inside <localpart@domain>,
+//      keeping @domain. The local part can encode the trap address
+//      when the MTA generates message IDs from the envelope recipient.
 //
 function redactEvidence(required string text) {
     var s = arguments.text;
@@ -177,10 +176,7 @@ function redactEvidence(required string text) {
     s = reReplaceNoCase(s, '(\bdarn=)[a-zA-Z0-9.\-]+', '\1[redacted]', 'ALL');
 
     // 7. From: and To: — redact only the local part of email addresses.
-    //    The local part can encode the trap address via tagged/subaddressed
-    //    delivery. The @domain is kept as it identifies the sending infrastructure.
-    //    Handles both bare addr@domain and display name <addr@domain> forms.
-    //    Applied only to lines starting with From: or To: at column 0.
+    //    The @domain is kept as it identifies the sending infrastructure.
     var fromToPattern = jPattern.compile(
         '(?im)^((?:From|To):.*?)[a-zA-Z0-9._%+\-]+(@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})'
     );
@@ -197,6 +193,26 @@ function redactEvidence(required string text) {
     }
     fromToMatcher.appendTail(sb2);
     s = sb2.toString();
+
+    // 8. Message-ID: — redact local part inside <localpart@domain>.
+    //    Some MTAs generate message IDs that include the envelope recipient.
+    //    Format is always <localpart@domain>; redact localpart, keep @domain.
+    var msgIdPattern = jPattern.compile(
+        '(?im)^(Message-ID:[ \t]*<)[^@>]+(@[a-zA-Z0-9.\-]+>)'
+    );
+    var msgIdMatcher = msgIdPattern.matcher(s);
+    var sb3 = createObject('java', 'java.lang.StringBuffer').init();
+    while (msgIdMatcher.find()) {
+        msgIdMatcher.appendReplacement(sb3,
+            javaCast('string',
+                msgIdMatcher.group(1).replaceAll('\\$', '\\\$') &
+                '[redacted]' &
+                msgIdMatcher.group(2).replaceAll('\\$', '\\\$')
+            )
+        );
+    }
+    msgIdMatcher.appendTail(sb3);
+    s = sb3.toString();
 
     return s;
 }
