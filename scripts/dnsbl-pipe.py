@@ -25,6 +25,14 @@ Reply
   script → pdns : END
   script → pdns : FAIL    (on internal error — pdns will retry once)
 
+Zone cache fill (ABI 1)
+-----------------------
+  pdns → script : LIST\t<domain-id>\t<zone-name>
+  script → pdns : DATA lines for all records in zone, then END
+  PowerDNS sends this on startup to build its zone cache. We return
+  the SOA and NS records only — individual DNSBL entries are not
+  pre-loaded, they are answered on demand via Q queries.
+
 Query types answered
 --------------------
   A       → 127.0.0.2 if listed, else NXDOMAIN (return END with no DATA)
@@ -42,15 +50,12 @@ Lookup logic
     e.g. 4.3.2.1.dnsbl.whizardries.com  →  subject = 4.3.2.1
     Un-reverse it: 1.2.3.4
     1. Exact match on ip.address = '1.2.3.4' AND entry_type = 'ip'
-    2. CIDR containment: INET_ATON('1.2.3.4') between
-       INET_ATON(ip.address) and INET_ATON(ip.address) + (POW(2, 32-ip.cidr) - 1)
-       for all active CIDR entries
+    2. CIDR containment: iterate active CIDR entries, test with ipaddress module
 
   Subject looks like a hostname            →  hostname lookup
     e.g. mail.example.com.dnsbl.whizardries.com  →  subject = mail.example.com
     1. Exact match on ip.address = 'mail.example.com' AND entry_type = 'hostname'
-    2. Wildcard match: ip.address = '.example.com'  (leading dot = wildcard)
-    3. Walk up labels: .com checked only if '.com' is stored (unusual but supported)
+    2. Wildcard walk-up: .mail.example.com, .example.com, .com
 
 Configuration
 -------------
@@ -59,7 +64,7 @@ Configuration
   Optional keys: DNSBL_ZONE, DNSBL_RETURN, DNSBL_TTL,
                  SOA_ORIGIN, SOA_HOSTMASTER, SOA_TTL, SOA_REFRESH,
                  SOA_RETRY, SOA_EXPIRE, SOA_MINTTL,
-                 NS_HOST, NS_TTL, PIPE_LOG
+                 NS_HOST, NS2_HOST, NS_TTL, PIPE_LOG
 
 Installation
 ------------
@@ -71,10 +76,8 @@ Installation
 
 import sys
 import os
-import re
 import logging
 import ipaddress
-from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Dependency check
@@ -142,10 +145,11 @@ SOA_REFRESH    = int(conf.get("SOA_REFRESH", "3600"))
 SOA_RETRY      = int(conf.get("SOA_RETRY",   "600"))
 SOA_EXPIRE     = int(conf.get("SOA_EXPIRE",  "86400"))
 SOA_MINTTL     = int(conf.get("SOA_MINTTL",  "300"))
-SOA_SERIAL     = 1  # static; PowerDNS doesn't require incrementing for pipe backend
+SOA_SERIAL     = 1  # static; pipe backend doesn't need incrementing serials
 
-NS_HOST = conf.get("NS_HOST", f"ns1.{DNSBL_ZONE}.")
-NS_TTL  = int(conf.get("NS_TTL", "3600"))
+NS_HOST  = conf.get("NS_HOST",  f"ns1.{DNSBL_ZONE}.")
+NS2_HOST = conf.get("NS2_HOST", "")
+NS_TTL   = int(conf.get("NS_TTL", "3600"))
 
 # ---------------------------------------------------------------------------
 # Database connection
@@ -223,7 +227,6 @@ def lookup_ip(ip_str: str):
             return True, f"Listed in {DNSBL_ZONE}"
 
         # 2. CIDR containment
-        ip_int = int(ip_obj)
         cur.execute(
             """
             SELECT id, address, cidr FROM ip
@@ -250,8 +253,7 @@ def lookup_hostname(subject: str):
 
     Tries in order:
       1. Exact hostname match
-      2. Wildcard match (.example.com covers all subdomains of example.com)
-      3. Walk up label-by-label looking for stored wildcards
+      2. Wildcard walk-up (.example.com covers all subdomains of example.com)
     """
     conn = get_conn()
     with conn.cursor() as cur:
@@ -272,10 +274,9 @@ def lookup_hostname(subject: str):
             _touch_last_hit(cur, row["id"])
             return True, f"Listed in {DNSBL_ZONE}"
 
-        # 2 & 3. Wildcard walk-up
-        # For 'mail.example.com', try '.mail.example.com', '.example.com', '.com'
+        # 2. Wildcard walk-up
         labels = subject.split(".")
-        for i in range(len(labels) - 1):       # don't try '.' alone
+        for i in range(len(labels) - 1):
             wildcard = "." + ".".join(labels[i + 1:])
             cur.execute(
                 """
@@ -316,79 +317,80 @@ def soa_record(qname: str) -> str:
         f"{SOA_REFRESH} {SOA_RETRY} {SOA_EXPIRE} {SOA_MINTTL}"
     )
 
-def ns_record(qname: str) -> str:
-    return f"DATA\t{qname}\tIN\tNS\t{NS_TTL}\t-1\t{NS_HOST}"
+def ns_record(qname: str, ns: str) -> str:
+    return f"DATA\t{qname}\tIN\tNS\t{NS_TTL}\t-1\t{ns}"
 
 def a_record(qname: str) -> str:
     return f"DATA\t{qname}\tIN\tA\t{DNSBL_TTL}\t-1\t{DNSBL_RETURN}"
 
 def txt_record(qname: str, text: str) -> str:
-    # TXT content must be double-quoted in the pipe protocol
     safe = text.replace('"', '\\"')
     return f'DATA\t{qname}\tIN\tTXT\t{DNSBL_TTL}\t-1\t"{safe}"'
+
+# ---------------------------------------------------------------------------
+# Zone apex records (used by both Q and LIST handlers)
+# ---------------------------------------------------------------------------
+
+def zone_apex_records(qname: str) -> list:
+    """Return SOA + NS DATA lines for the zone apex."""
+    lines = [soa_record(qname), ns_record(qname, NS_HOST)]
+    if NS2_HOST:
+        lines.append(ns_record(qname, NS2_HOST))
+    return lines
 
 # ---------------------------------------------------------------------------
 # Query dispatcher
 # ---------------------------------------------------------------------------
 ZONE_SUFFIX = f".{DNSBL_ZONE}"
-ZONE_APEX   = DNSBL_ZONE  # lower-case for comparison
+ZONE_APEX   = DNSBL_ZONE
 
 def handle_query(qname: str, qtype: str) -> list:
     """
-    Process one DNS query. Returns a list of strings to write to stdout
-    (DATA lines, then END — or just END for NXDOMAIN).
-    FAIL is returned as a single-element list ["FAIL"].
+    Process one DNS query. Returns a list of response lines (DATA + END,
+    or just END for NXDOMAIN, or FAIL on internal error).
     """
     qname_lower = qname.lower().rstrip(".")
     lines = []
 
     try:
-        # ── Zone apex: SOA / NS ────────────────────────────────────────────
+        # ── Zone apex ─────────────────────────────────────────────────────
         if qname_lower == ZONE_APEX:
             if qtype in ("SOA", "ANY", "NS"):
                 if qtype in ("SOA", "ANY"):
                     lines.append(soa_record(qname))
                 if qtype in ("NS", "ANY"):
-                    lines.append(ns_record(qname))
-            # NS2 if configured
-            ns2 = conf.get("NS2_HOST")
-            if ns2 and qtype in ("NS", "ANY"):
-                lines.append(f"DATA\t{qname}\tIN\tNS\t{NS_TTL}\t-1\t{ns2}")
+                    lines.append(ns_record(qname, NS_HOST))
+                    if NS2_HOST:
+                        lines.append(ns_record(qname, NS2_HOST))
             lines.append("END")
             return lines
 
-        # ── Sub-zone SOA fallback (needed for NXDOMAIN NSEC, etc.) ─────────
+        # ── Not in our zone ───────────────────────────────────────────────
         if not qname_lower.endswith(ZONE_SUFFIX):
-            # Not in our zone at all
             lines.append("END")
             return lines
 
-        # ── Strip zone suffix to get the subject ───────────────────────────
+        # ── Strip zone suffix to get the subject ──────────────────────────
         subject = qname_lower[: -len(ZONE_SUFFIX)]
-
         if not subject:
             lines.append("END")
             return lines
 
-        # ── Only answer A, TXT, ANY queries ───────────────────────────────
-        # For other qtypes (MX, AAAA, etc.) just return END (NXDOMAIN effect)
-        if qtype not in ("A", "TXT", "ANY", "SOA"):
-            lines.append("END")
-            return lines
-
-        # SOA within the zone — return the apex SOA
+        # ── SOA anywhere in zone → return apex SOA ────────────────────────
         if qtype == "SOA":
             lines.append(soa_record(DNSBL_ZONE))
             lines.append("END")
             return lines
 
+        # ── Only answer A, TXT, ANY for DNSBL lookups ────────────────────
+        if qtype not in ("A", "TXT", "ANY"):
+            lines.append("END")
+            return lines
+
         # ── Dispatch to IP or hostname lookup ─────────────────────────────
         if _is_reversed_ip(subject):
-            ip_str = _unreverse_ip(subject)
-            listed, reason = lookup_ip(ip_str)
+            listed, reason = lookup_ip(_unreverse_ip(subject))
         else:
-            # Hostname: the subject may itself be dotted, e.g.
-            # 'mail.example.com' from 'mail.example.com.dnsbl.whizardries.com'
             listed, reason = lookup_hostname(subject)
 
         if listed:
@@ -404,12 +406,34 @@ def handle_query(qname: str, qtype: str) -> list:
         log.error("Error handling query %s/%s: %s", qname, qtype, e)
         return ["FAIL"]
 
+def handle_list(zone: str) -> list:
+    """
+    Respond to a LIST command (ABI 1 zone cache fill).
+    PowerDNS sends this on startup to enumerate all records in a zone.
+    We return only the zone apex SOA and NS records — individual DNSBL
+    entries are not pre-enumerable and are answered on-demand via Q.
+    Returning END with no DATA is treated as a fatal backend error by
+    pdns 4.x, so we must return at least the SOA.
+    """
+    zone_lower = zone.lower().rstrip(".")
+    lines = []
+    try:
+        if zone_lower == ZONE_APEX:
+            lines.extend(zone_apex_records(DNSBL_ZONE))
+        # For any other zone, return empty (END only) — pipe-regex
+        # should prevent pdns from sending us out-of-zone LISTs anyway.
+        lines.append("END")
+    except Exception as e:
+        log.error("Error handling LIST for %s: %s", zone, e)
+        lines = ["END"]  # don't FAIL on LIST — just return empty
+    return lines
+
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
 
 def main():
-    # Flush stdout immediately — PowerDNS reads line by line
+    # Line-buffered stdout — PowerDNS reads line by line
     sys.stdout = os.fdopen(sys.stdout.fileno(), "w", buffering=1)
 
     log.info("dnsbl-pipe.py starting, zone=%s", DNSBL_ZONE)
@@ -427,7 +451,8 @@ def main():
     # Pre-connect to DB
     try:
         get_conn()
-        log.info("Database connected: %s@%s/%s", DB_CONFIG["user"], DB_CONFIG["host"], DB_CONFIG["db"])
+        log.info("Database connected: %s@%s/%s",
+                 DB_CONFIG["user"], DB_CONFIG["host"], DB_CONFIG["db"])
     except Exception as e:
         log.error("Initial DB connect failed: %s", e)
         # Don't exit — will retry on first query
@@ -438,26 +463,29 @@ def main():
             continue
 
         parts = line.split("\t")
+        cmd = parts[0]
 
-        if parts[0] == "Q":
+        if cmd == "Q":
             if len(parts) < 6:
                 log.warning("Malformed Q line: %r", line)
                 sys.stdout.write("FAIL\n")
                 continue
-
-            qname  = parts[1]
-            qtype  = parts[3].upper()
-            # parts[4] = id, parts[5] = remote-ip (ignore both)
-
-            answers = handle_query(qname, qtype)
-            for ans in answers:
+            qname = parts[1]
+            qtype = parts[3].upper()
+            for ans in handle_query(qname, qtype):
                 sys.stdout.write(ans + "\n")
 
-        elif parts[0] == "AXFR":
-            # We don't support AXFR — just END it
+        elif cmd == "LIST":
+            # LIST\t<domain-id>\t<zone-name>  (ABI 1 zone cache fill)
+            zone = parts[2] if len(parts) >= 3 else DNSBL_ZONE
+            log.info("LIST request for zone: %s", zone)
+            for ans in handle_list(zone):
+                sys.stdout.write(ans + "\n")
+
+        elif cmd == "AXFR":
             sys.stdout.write("END\n")
 
-        elif parts[0] == "PING":
+        elif cmd == "PING":
             sys.stdout.write("END\n")
 
         else:
