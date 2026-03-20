@@ -82,48 +82,41 @@ function detectEntryType(required string addr) {
 //
 // Rules applied in order:
 //
-//   0. Normalize CRLF → LF so that ^ and $ anchors work reliably.
-//      Email headers stored from Windows/Outlook clients or passed through
-//      certain MTAs arrive with \r\n line endings; Java regex (?m) mode
-//      only treats \n as a line boundary, so \r\n breaks all anchored rules.
+//   0. Normalize CRLF → LF.
 //
 //   1. Manual blocks: [REDACT]...[/REDACT] → [redacted]
-//      Escape hatch for anything not covered by the rules below.
 //
-//   2. Headers whose entire value is redacted (recipient-revealing):
+//   2. Headers whose entire value is redacted (recipient-revealing).
+//      Anchored to column 0 (no leading whitespace) to avoid matching
+//      folded continuation lines. Folded continuations (lines starting
+//      with \t or space) that follow a matched header are also consumed.
 //        Delivered-To, X-Original-To, X-Forwarded-To
 //        Envelope-To, X-Envelope-To, X-RCPT-To, X-Spam-Rcpt
-//        X-Forwarded-Encrypted  — encrypted blob contains recipient domain
-//        X-BeenThere            — Google Groups list address, reveals trap
-//        X-Spam-Checked-In-Group — explicit trap address
+//        X-Forwarded-Encrypted, X-BeenThere, X-Spam-Checked-In-Group
 //
 //   3. Return-Path: — redact only the <address> inside angle brackets.
 //
-//   4. Received: continuation lines with (envelope-from <addr>) — redact
-//      only the address; the rest of the hop is preserved.
+//   4. Received: (envelope-from <addr>) clause — redact address only.
 //
-//   5. Received: "for <addr>" / "for addr" clause — redact address only.
+//   5. Received: "for <addr>" clause — redact address only.
 //
-//   6. DKIM-Signature / ARC-* / X-Google-DKIM-Signature: darn= tag —
-//      leaks the recipient domain; redact the value after darn=.
-//
-//   Everything else — From:, To: (spammer's), Subject:, SPF/DKIM/DMARC
-//   results, relay IPs, timestamps, message body — is shown as-is.
+//   6. darn= tag — leaks recipient domain; redact the value.
 //
 function redactEvidence(required string text) {
     var s = arguments.text;
 
     // 0. Normalize line endings — CRLF and bare CR → LF.
-    //    Java regex (?m) only recognises \n as a line boundary; \r\n causes
-    //    ^ and $ anchors to fail, leaving every header-based rule ineffective.
     s = replace(s, chr(13) & chr(10), chr(10), 'ALL');
     s = replace(s, chr(13), chr(10), 'ALL');
 
-    // 1. Manual redaction blocks (case-insensitive, spanning newlines)
+    // 1. Manual redaction blocks
     s = reReplaceNoCase(s, '\[REDACT\].*?\[/REDACT\]', '[redacted]', 'ALL');
 
-    // 2. Headers whose entire value reveals the recipient — whole line
-    //    value replaced. Anchored to start of line.
+    // 2. Recipient-revealing headers.
+    //    Pattern: anchored to ^ (column 0 only, not after whitespace),
+    //    matches the header value on the first line, then greedily consumes
+    //    any following folded continuation lines (lines starting with \t or space).
+    //    Uses Java Pattern directly for reliable multiline behaviour.
     var recipientHeaders =
         'Delivered-To' &
         '|X-Original-To' &
@@ -135,23 +128,35 @@ function redactEvidence(required string text) {
         '|X-Forwarded-Encrypted' &
         '|X-BeenThere' &
         '|X-Spam-Checked-In-Group';
-    s = reReplaceNoCase(
-        s,
-        '(?m)^([ \t]*(?:' & recipientHeaders & '):[ \t]*).*$',
-        '\1[redacted]',
-        'ALL'
+
+    // Build pattern: ^(HeaderName):[ \t]*[^\n]*(\n[ \t]+[^\n]*)*
+    // This matches the header line and any folded continuation lines.
+    var jPattern = createObject('java', 'java.util.regex.Pattern');
+    var jMatcher = jPattern.compile(
+        '(?im)^(' & recipientHeaders & '):[ \t]*[^\n]*(\n[ \t]+[^\n]*)*'
     );
+    var matcher = jMatcher.matcher(s);
+    // Replace each match with "HeaderName: [redacted]"
+    var sb = createObject('java', 'java.lang.StringBuffer').init();
+    while (matcher.find()) {
+        // group(1) is the header name captured by the first () in the alternation —
+        // but with alternation the group number is 1 for the whole match prefix.
+        // Use replaceAll-style: replace entire match with name + redacted.
+        var matchedName = listFirst(matcher.group(0), ':');
+        matcher.appendReplacement(sb, javaCast('string', matchedName & ': [redacted]'));
+    }
+    matcher.appendTail(sb);
+    s = sb.toString();
 
     // 3. Return-Path: redact only the <address> portion.
     s = reReplaceNoCase(
         s,
-        '(?m)^([ \t]*Return-Path:[ \t]*)<[^>]*>',
+        '(?m)^(Return-Path:[ \t]*)<[^>]*>',
         '\1<[redacted]>',
         'ALL'
     );
 
-    // 4. Received: continuation lines — (envelope-from <addr>) clause.
-    //    These appear as indented continuation lines inside a Received: block.
+    // 4. (envelope-from <addr>) clause in Received: lines.
     s = reReplaceNoCase(
         s,
         '(\(envelope-from\s+)<[^>]*>(\))',
@@ -159,8 +164,7 @@ function redactEvidence(required string text) {
         'ALL'
     );
 
-    // 5. Received: "for" clause — redact address, preserve rest of line.
-    //    Handles both "for <addr>" and bare "for addr" forms.
+    // 5. "for <addr>" / "for addr" clause in Received: lines.
     s = reReplaceNoCase(s, '(\bfor\s+)<[^>]+>', '\1<[redacted]>', 'ALL');
     s = reReplaceNoCase(
         s,
@@ -169,14 +173,8 @@ function redactEvidence(required string text) {
         'ALL'
     );
 
-    // 6. darn= tag in DKIM-Signature and ARC-* headers — value is the
-    //    recipient domain (e.g. darn=lexprotego.com). Redact the domain.
-    s = reReplaceNoCase(
-        s,
-        '(\bdarn=)[a-zA-Z0-9.\-]+',
-        '\1[redacted]',
-        'ALL'
-    );
+    // 6. darn= tag — recipient domain.
+    s = reReplaceNoCase(s, '(\bdarn=)[a-zA-Z0-9.\-]+', '\1[redacted]', 'ALL');
 
     return s;
 }
