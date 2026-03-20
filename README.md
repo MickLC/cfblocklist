@@ -134,6 +134,10 @@ cp scripts/dnsbl-pipe.py /opt/blocklist/dnsbl-pipe.py
 chmod 755 /opt/blocklist/dnsbl-pipe.py
 chown root:pdns /opt/blocklist/dnsbl-pipe.py
 
+# Create the log file with correct ownership
+touch /var/log/dnsbl-pipe.log
+chown pdns:pdns /var/log/dnsbl-pipe.log
+
 # Deploy and fill in the config
 cp scripts/blocklist.conf.example /opt/blocklist/blocklist.conf
 chmod 640 /opt/blocklist/blocklist.conf
@@ -144,10 +148,10 @@ chown root:pdns /opt/blocklist/blocklist.conf
 Smoke-test the script standalone before touching PowerDNS:
 
 ```bash
-echo -e "HELO\t1\nQ\t4.3.2.1.dnsbl.whizardries.com\tIN\tA\t1\t10.0.0.1\nQ\tdnsbl.whizardries.com\tIN\tSOA\t2\t10.0.0.1" \
+echo -e "HELO\t1\nQ\t4.3.2.1.dnsbl.example.com\tIN\tA\t1\t10.0.0.1\nQ\tdnsbl.example.com\tIN\tSOA\t2\t10.0.0.1" \
   | /opt/blocklist/dnsbl-pipe.py
 # Expected:
-#   OK    dnsbl-pipe.py v1 zone=dnsbl.whizardries.com
+#   OK    dnsbl-pipe.py v1 zone=dnsbl.example.com
 #   END                   (or DATA ... if 1.2.3.4 is listed)
 #   DATA  ... SOA ...
 #   END
@@ -155,21 +159,21 @@ echo -e "HELO\t1\nQ\t4.3.2.1.dnsbl.whizardries.com\tIN\tA\t1\t10.0.0.1\nQ\tdnsbl
 
 ### 6. Configure PowerDNS
 
-The zone `dnsbl.whizardries.com` must exist in PowerDNS so it will forward
+The zone `dnsbl.example.com` must exist in PowerDNS so it will forward
 queries to the pipe backend. Create it via `pdnsutil` if it doesn't exist yet:
 
 ```bash
-pdnsutil create-zone dnsbl.whizardries.com ns1.whizardries.com
-pdnsutil add-record  dnsbl.whizardries.com @ NS ns1.whizardries.com
-pdnsutil add-record  dnsbl.whizardries.com @ NS ns2.whizardries.com
-pdnsutil set-kind    dnsbl.whizardries.com NATIVE
+pdnsutil create-zone dnsbl.example.com ns1.example.com
+pdnsutil add-record  dnsbl.example.com @ NS ns1.example.com
+pdnsutil add-record  dnsbl.example.com @ NS ns2.example.com
+pdnsutil set-kind    dnsbl.example.com NATIVE
 ```
 
 Then drop in the pipe backend config fragment:
 
 ```bash
 cp scripts/pdns-pipe.conf /etc/powerdns/pdns.d/pipe-dnsbl.conf
-# Review and adjust pipe-instances and pipe-timeout if needed
+# Edit pipe-regex to match your zone, then:
 systemctl restart pdns
 ```
 
@@ -177,11 +181,11 @@ Verify PowerDNS picked it up:
 
 ```bash
 journalctl -u pdns --since "1 minute ago" | grep -i pipe
-pdnsutil check-zone dnsbl.whizardries.com
+pdnsutil check-zone dnsbl.example.com
 
-# Live test (run from Harry itself):
-dig @127.0.0.1 4.3.2.1.dnsbl.whizardries.com A
-dig @127.0.0.1 dnsbl.whizardries.com SOA
+# Live test:
+dig @127.0.0.1 4.3.2.1.dnsbl.example.com A
+dig @127.0.0.1 dnsbl.example.com SOA
 ```
 
 If `4.3.2.1` (`1.2.3.4` reversed) is in the blocklist as active you should get
@@ -216,7 +220,7 @@ over stdin/stdout using a simple tab-delimited line protocol.
 **IP lookups** arrive as reversed-octet queries:
 
 ```
-4.3.2.1.dnsbl.whizardries.com  →  look up 1.2.3.4
+4.3.2.1.dnsbl.example.com  →  look up 1.2.3.4
 ```
 
 The script checks for:
@@ -226,7 +230,7 @@ The script checks for:
 **Hostname lookups** arrive as forward-format queries:
 
 ```
-mail.example.com.dnsbl.whizardries.com  →  look up mail.example.com
+mail.example.com.dnsbl.example.com  →  look up mail.example.com
 ```
 
 The script checks:
