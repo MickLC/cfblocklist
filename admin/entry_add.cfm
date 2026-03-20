@@ -104,8 +104,6 @@
             detail    = "locked=#form.locked#"
         )>
 
-        <cfset reloadRbldnsd()>
-
         <!--- Clear form on success --->
         <cfset form.address  = "">
         <cfset form.evidence = "">
@@ -208,7 +206,7 @@
         <div class="card mt-3 border-0 bg-light">
             <div class="card-body py-2 small text-muted">
                 <strong>Tips:</strong>
-                Adding an entry triggers an rbldnsd zone reload automatically.
+                New entries take effect immediately.
                 Evidence is shown publicly — paste raw log lines or mail headers.
                 HTML is escaped; plain text only.
             </div>

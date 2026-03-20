@@ -82,7 +82,6 @@ displayEntry = entry.entry_type EQ "cidr"
                 target    = displayEntry,
                 entryType = entry.entry_type
             )>
-            <cfset reloadRbldnsd()>
             <cfset successMsg = "Active status updated.">
             <cfquery datasource="#application.dsn#" name="entry">
                 SELECT i.*, l.name AS added_by_name FROM ip i LEFT JOIN login l ON i.added_by = l.id

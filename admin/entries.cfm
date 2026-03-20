@@ -58,7 +58,6 @@
                     WHERE id = <cfqueryparam value="#actionId#" cfsqltype="cf_sql_integer">
                 </cfquery>
                 <cfset writeAuditLog(action="DEACTIVATE", target=aDisplay, entryType=actionEntry.entry_type)>
-                <cfset reloadRbldnsd()>
             </cfcase>
             <cfcase value="activate">
                 <cfquery datasource="#application.dsn#">
@@ -68,7 +67,6 @@
                     WHERE id = <cfqueryparam value="#actionId#" cfsqltype="cf_sql_integer">
                 </cfquery>
                 <cfset writeAuditLog(action="ACTIVATE", target=aDisplay, entryType=actionEntry.entry_type)>
-                <cfset reloadRbldnsd()>
             </cfcase>
             <cfcase value="delete">
                 <!--- Hard delete — admin only, removes record and all evidence --->
@@ -76,7 +74,6 @@
                     DELETE FROM ip WHERE id = <cfqueryparam value="#actionId#" cfsqltype="cf_sql_integer">
                 </cfquery>
                 <cfset writeAuditLog(action="DELETE", target=aDisplay, entryType=actionEntry.entry_type)>
-                <cfset reloadRbldnsd()>
             </cfcase>
         </cfswitch>
 
