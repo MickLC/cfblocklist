@@ -48,6 +48,13 @@ switch (entry.entry_type) {
     case "hostname": displayEntry = entry.address; break;
     default:         displayEntry = entry.address;
 }
+// Pre-encode values used in JS/URL contexts outside cfoutput blocks
+safeDisplayEntry    = encodeForHTML(displayEntry);
+safeDisplayEntryURL = encodeForURL(displayEntry);
+safeAdminEmail      = encodeForHTML(application.adminEmail);
+safeAdminEmailURL   = encodeForURL(application.adminEmail);
+safeContactText     = encodeForHTML(application.contactText);
+safeEntryId         = encodeForURL(entry.id);
 </cfscript>
 
 <cfparam name="attributes.pageTitle" default="Evidence — #encodeForHTML(displayEntry)#">
@@ -66,7 +73,7 @@ switch (entry.entry_type) {
         <div class="card shadow-sm mb-3">
             <div class="card-header d-flex align-items-center justify-content-between">
                 <div>
-                    <span class="font-monospace fw-bold fs-5"><cfoutput>#encodeForHTML(displayEntry)#</cfoutput></span>
+                    <span class="font-monospace fw-bold fs-5"><cfoutput>#safeDisplayEntry#</cfoutput></span>
                     <cfoutput>
                     <span class="badge ms-2
                         <cfif entry.entry_type EQ 'hostname'>text-white" style="background:##6f42c1
@@ -85,7 +92,7 @@ switch (entry.entry_type) {
             <div class="card-body">
                 <dl class="row mb-2">
                     <dt class="col-sm-3">Listed entry</dt>
-                    <dd class="col-sm-9 font-monospace"><cfoutput>#encodeForHTML(displayEntry)#</cfoutput></dd>
+                    <dd class="col-sm-9 font-monospace"><cfoutput>#safeDisplayEntry#</cfoutput></dd>
                     <dt class="col-sm-3">Date listed</dt>
                     <dd class="col-sm-9"><cfoutput>#dateFormat(entry.added_date,"mmmm d, yyyy")# at #timeFormat(entry.added_date,"h:mm tt")#</cfoutput></dd>
                     <dt class="col-sm-3">Status</dt>
@@ -101,13 +108,17 @@ switch (entry.entry_type) {
                 <div class="d-flex gap-2 mt-3">
                     <a href="/" class="btn btn-sm btn-outline-secondary">&larr; Back to lookup</a>
                     <cfif NOT entry.locked>
-                        <a href="/delist.cfm?id=<cfoutput>#encodeForURL(entry.id)#</cfoutput>"
+                        <!---
+                            onclick confirm uses pre-encoded safeDisplayEntry set above in cfscript.
+                            No cfoutput needed here; the variable is already a plain string in scope.
+                        --->
+                        <a href="/delist.cfm?id=<cfoutput>#safeEntryId#</cfoutput>"
                            class="btn btn-sm btn-success"
-                           onclick="return confirm('Remove #encodeForHTML(displayEntry)# from the blocklist? This is immediate.')">
+                           onclick="return confirm('Remove <cfoutput>#safeDisplayEntry#</cfoutput> from the blocklist? This is immediate.')">
                             Delist this entry
                         </a>
                     <cfelse>
-                        <a href="mailto:<cfoutput>#encodeForHTML(application.adminEmail)#</cfoutput>?subject=Delist+request+for+<cfoutput>#encodeForURL(displayEntry)#</cfoutput>"
+                        <a href="mailto:<cfoutput>#safeAdminEmail#</cfoutput>?subject=Delist+request+for+<cfoutput>#safeDisplayEntryURL#</cfoutput>"
                            class="btn btn-sm btn-outline-warning">
                             Contact administrator
                         </a>
@@ -150,8 +161,8 @@ switch (entry.entry_type) {
         <cfif entry.locked>
             <div class="alert alert-warning mt-2">
                 <strong>Locked listing.</strong>
-                This entry cannot be self-delisted. <cfoutput>#encodeForHTML(application.contactText)#</cfoutput>
-                Contact <a href="mailto:<cfoutput>#encodeForHTML(application.adminEmail)#</cfoutput>"><cfoutput>#encodeForHTML(application.adminEmail)#</cfoutput></a> to appeal.
+                <cfoutput>#safeContactText#</cfoutput>
+                Contact <a href="mailto:<cfoutput>#safeAdminEmail#</cfoutput>"><cfoutput>#safeAdminEmail#</cfoutput></a> to appeal.
             </div>
         </cfif>
 
