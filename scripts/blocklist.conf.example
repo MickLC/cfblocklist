@@ -1,13 +1,13 @@
 # /opt/blocklist/blocklist.conf
 #
-# Runtime configuration for cfblocklist shell scripts.
+# Runtime configuration for cfblocklist scripts.
 # This file is NOT committed to version control — it contains
 # environment-specific values and database credentials.
 #
 # Setup:
-#   cp blocklist.conf.example /opt/blocklist/blocklist.conf
+#   cp scripts/blocklist.conf.example /opt/blocklist/blocklist.conf
 #   chmod 640 /opt/blocklist/blocklist.conf
-#   chown root:www-data /opt/blocklist/blocklist.conf
+#   chown root:pdns /opt/blocklist/blocklist.conf
 #   # Edit with your actual values
 
 # ── Database connection ────────────────────────────────────────────────────
@@ -17,28 +17,29 @@ DB_NAME="blocklist"
 DB_USER="blocklist_app"
 DB_PASS="your-password"
 
-# ── Zone file paths ────────────────────────────────────────────────────────
-ZONE_DIR="/var/lib/rbldns"
+# ── DNSBL zone and return value ────────────────────────────────────────────
+# Zone must match pipe-regex in pdns-pipe.conf AND the zone configured
+# in PowerDNS (gmysql or bind backend zone record).
+DNSBL_ZONE="dnsbl.whizardries.com"
+DNSBL_RETURN="127.0.0.2"
+DNSBL_TTL="300"
 
 # ── Zone SOA/NS ────────────────────────────────────────────────────────────
-# All times in seconds — rbldnsd does not accept BIND shorthand like 1h or 1d.
-# Serial 0 is intentional: rbldnsd substitutes the file's mtime automatically.
-SOA_ORIGIN="ns1.dnsbl.example.com."
-SOA_HOSTMASTER="hostmaster.example.com."
-SOA_TTL=3600
-SOA_REFRESH=3600
-SOA_RETRY=600
-SOA_EXPIRE=86400
-SOA_MINTTL=3600
+# These are used by the pipe backend to answer SOA and NS queries.
+# Must match what your authoritative zone record says.
+SOA_ORIGIN="ns1.whizardries.com."
+SOA_HOSTMASTER="hostmaster.whizardries.com."
+SOA_TTL="3600"
+SOA_REFRESH="3600"
+SOA_RETRY="600"
+SOA_EXPIRE="86400"
+SOA_MINTTL="300"
 
-NS_HOST="ns1.dnsbl.example.com."
-NS_TTL=3600
+NS_HOST="ns1.whizardries.com."
+NS_TTL="3600"
+# Optional second nameserver:
+# NS2_HOST="ns2.whizardries.com."
 
-# ── Return value for listed entries ───────────────────────────────────────
-DNSBL_RETURN="127.0.0.2"
-DNSBL_ZONE="dnsbl.example.com"
-
-# ── Paths ──────────────────────────────────────────────────────────────────
-RBLDNSD_PIDFILE="/var/run/rbldnsd.pid"
-RELOAD_LOG="/var/log/rbldnsd-reload.log"
+# ── Logging ────────────────────────────────────────────────────────────────
+PIPE_LOG="/var/log/dnsbl-pipe.log"
 EXPIRE_LOG="/var/log/blocklist-expire.log"
