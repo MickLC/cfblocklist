@@ -108,10 +108,6 @@ safeEntryId         = encodeForURL(entry.id);
                 <div class="d-flex gap-2 mt-3">
                     <a href="/" class="btn btn-sm btn-outline-secondary">&larr; Back to lookup</a>
                     <cfif NOT entry.locked>
-                        <!---
-                            onclick confirm uses pre-encoded safeDisplayEntry set above in cfscript.
-                            No cfoutput needed here; the variable is already a plain string in scope.
-                        --->
                         <a href="/delist.cfm?id=<cfoutput>#safeEntryId#</cfoutput>"
                            class="btn btn-sm btn-success"
                            onclick="return confirm('Remove <cfoutput>#safeDisplayEntry#</cfoutput> from the blocklist? This is immediate.')">
@@ -149,10 +145,8 @@ safeEntryId         = encodeForURL(entry.id);
                         &mdash; added #dateFormat(added_date,"mmm d, yyyy")# at #timeFormat(added_date,"h:mm tt")#
                     </div>
                     <div class="card-body p-0">
-                        <div class="evidence-box rounded-bottom"
-                             style="border-top:0;border-radius:0 0 .375rem .375rem;padding:1rem;font-family:monospace;font-size:.85rem;white-space:pre-wrap;word-break:break-all;background:##fff">
-                            #encodeForHTML(redactEvidence(evidence))#
-                        </div>
+<!--- NOTE: No whitespace between > and # below — pre-wrap renders it literally --->
+<div class="evidence-box rounded-bottom" style="border-top:0;border-radius:0 0 .375rem .375rem;padding:1rem;font-family:monospace;font-size:.85rem;white-space:pre-wrap;word-break:break-all;background:##fff">#encodeForHTML(trim(redactEvidence(evidence)))#</div>
                     </div>
                 </div>
             </cfoutput>

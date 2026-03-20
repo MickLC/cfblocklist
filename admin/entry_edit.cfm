@@ -144,7 +144,7 @@ displayEntry = entry.entry_type EQ "cidr"
                     WHERE id   = <cfqueryparam value="#val(form.evid_id)#"    cfsqltype="cf_sql_integer">
                       AND ip_id = <cfqueryparam value="#entryId#"              cfsqltype="cf_sql_integer">
                 </cfquery>
-                <cfset writeAuditLog(action="EDIT", target=displayEntry, entryType=entry.entry_type, detail="Updated evidence record ##form.evid_id#")>
+                <cfset writeAuditLog(action="EDIT", target=displayEntry, entryType=entry.entry_type, detail="Updated evidence record ###form.evid_id#")>
                 <cfset successMsg = "Evidence record updated.">
             </cfif>
         </cfcase>
@@ -157,7 +157,7 @@ displayEntry = entry.entry_type EQ "cidr"
                     WHERE id   = <cfqueryparam value="#val(form.evid_id)#" cfsqltype="cf_sql_integer">
                       AND ip_id = <cfqueryparam value="#entryId#"           cfsqltype="cf_sql_integer">
                 </cfquery>
-                <cfset writeAuditLog(action="EDIT", target=displayEntry, entryType=entry.entry_type, detail="Deleted evidence record ##form.evid_id#")>
+                <cfset writeAuditLog(action="EDIT", target=displayEntry, entryType=entry.entry_type, detail="Deleted evidence record ###form.evid_id#")>
                 <cfset successMsg = "Evidence record deleted.">
             </cfif>
         </cfcase>
@@ -375,10 +375,8 @@ displayEntry = entry.entry_type EQ "cidr"
                         <form method="post" action="/admin/entry_edit.cfm?id=#encodeForURL(entryId)#">
                             <input type="hidden" name="action"  value="updateevidence">
                             <input type="hidden" name="evid_id" value="#id#">
-                            <textarea class="form-control font-monospace mb-2"
-                                      name="evid_text"
-                                      rows="8"
-                                      style="font-size:.82rem">#encodeForHTML(evidence)#</textarea>
+<!--- NOTE: No whitespace between > and # in textarea — pre-wrap renders it literally --->
+<textarea class="form-control font-monospace mb-2" name="evid_text" rows="8" style="font-size:.82rem">#encodeForHTML(trim(evidence))#</textarea>
                             <button type="submit" class="btn btn-sm btn-outline-secondary">Update record</button>
                         </form>
                     </div>
@@ -389,11 +387,8 @@ displayEntry = entry.entry_type EQ "cidr"
                 <h6 class="fw-semibold mb-2">Add evidence record</h6>
                 <form method="post" action="/admin/entry_edit.cfm?id=<cfoutput>#encodeForURL(entryId)#</cfoutput>">
                     <input type="hidden" name="action" value="addevidence">
-                    <textarea   class="form-control font-monospace mb-2"
-                                name="new_evidence"
-                                rows="8"
-                                placeholder="Paste additional log lines, headers, or notes."
-                                style="font-size:.82rem"><cfoutput>#encodeForHTML(form.new_evidence)#</cfoutput></textarea>
+<!--- NOTE: No whitespace between > and # in textarea — pre-wrap renders it literally --->
+<textarea class="form-control font-monospace mb-2" name="new_evidence" rows="8" placeholder="Paste additional log lines, headers, or notes." style="font-size:.82rem"><cfoutput>#encodeForHTML(trim(form.new_evidence))#</cfoutput></textarea>
                     <button type="submit" class="btn btn-primary btn-sm">Add evidence record</button>
                 </form>
             </div>
